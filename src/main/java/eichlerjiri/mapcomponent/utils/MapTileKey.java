@@ -13,10 +13,10 @@ public class MapTileKey {
         changeTo(zoom, x, y);
     }
 
-    public void changeTo(int zoom, int x, int y) {
-        this.zoom = zoom;
-        this.x = x;
-        this.y = y;
+    public void changeTo(int newZoom, int newX, int newY) {
+        zoom = newZoom;
+        x = newX;
+        y = newY;
     }
 
     @Override

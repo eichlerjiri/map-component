@@ -54,8 +54,10 @@ public class TileLoader extends ThreadPoolExecutor {
         if (cacheFileExists) {
             data = IOUtils.readFile(cacheFile);
         } else {
-            data = IOUtils.download(mapUrls.get(new Random().nextInt(mapUrls.size())) +
-                    tileKey.zoom + "/" + tileKey.x + "/" + tileKey.y + ".png");
+            String url = mapUrls.get(new Random().nextInt(mapUrls.size())) +
+                    tileKey.zoom + "/" + tileKey.x + "/" + tileKey.y + ".png";
+            Log.i("TileLoader", "Downloading: " + url);
+            data = IOUtils.download(url);
         }
 
         if (data == null) {

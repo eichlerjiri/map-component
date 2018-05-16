@@ -2,7 +2,6 @@ package eichlerjiri.mapcomponent;
 
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
-import android.util.Log;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -18,14 +17,16 @@ import static android.opengl.GLES20.*;
 
 public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
+    private static final float tileSize = 256.0f;
+
     private final MapComponent mapComponent;
+
+    public double posX = 0.5;
+    public double posY = 0.5;
+    public float zoom = 4.0f;
 
     private final HashMap<MapTileKey, Integer> tileCache = new HashMap<>();
     private final MapTileKey testKey = new MapTileKey();
-
-    private double posX = 0.5;
-    private double posY = 0.5;
-    private float zoom = 1f;
 
     private MapShader mapShader;
     private int mapVbuffer;
@@ -35,6 +36,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     private int h;
     private float surfaceCenterX;
     private float surfaceCenterY;
+    private int searchDist;
     private final float[] mapMatrix = new float[16];
 
     private final int[] itmp1 = new int[1];
@@ -72,6 +74,10 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         h = height;
         surfaceCenterX = width * 0.5f;
         surfaceCenterY = height * 0.5f;
+
+        int tilesNecessaryBase = (int) (Math.sqrt(width * width + height * height) / tileSize);
+        searchDist = (tilesNecessaryBase + 1) / 2;
+
         Matrix.orthoM(mapMatrix, 0, 0, width, height, 0, -10, 10);
     }
 
@@ -82,47 +88,94 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         int mapZoom = (int) zoom;
         int tiles = 1 << mapZoom;
 
-        double equatorPixels = 256.0 * Math.pow(2, zoom);
-        float scale = (float) (equatorPixels / tiles);
+        float scale = (float) (mercatorPixels() / tiles);
 
         double centerX = tiles * posX;
         double centerY = tiles * posY;
 
-        int tileX = (int) centerX;
-        int tileY = (int) centerY;
+        int centerTileX = (int) centerX;
+        int centerTileY = (int) centerY;
+        if (centerTileY == tiles) {
+            centerTileY--;
+        }
 
-        float centerShiftX = (float) ((centerX - tileX) * equatorPixels);
-        float centerShiftY = (float) ((centerY - tileY) * equatorPixels);
+        for (int i = centerTileX - searchDist; i <= centerTileX + searchDist; i++) {
+            for (int j = centerTileY - searchDist; j <= centerTileY + searchDist; j++) {
+                drawTile(mapZoom, i, j, tiles, centerX, centerY, scale);
+            }
+        }
+    }
+
+    private void drawTile(int mapZoom, int tileX, int tileY, int tiles, double centerX, double centerY, float scale) {
+        if (tileY < 0 || tileY >= tiles) {
+            return;
+        }
+
+        int tileXreal = tileX;
+        while (tileXreal < 0) {
+            tileXreal += tiles;
+        }
+        while (tileXreal >= tiles) {
+            tileXreal -= tiles;
+        }
+
+        testKey.changeTo(mapZoom, tileXreal, tileY);
+        Integer textureId = tileCache.get(testKey);
+
+        if (textureId == null) {
+            mapComponent.tileLoader.requestTile(new MapTileKey(mapZoom, tileXreal, tileY));
+            return;
+        }
+        if (textureId == 0) {
+            return;
+        }
+
+        float centerShiftX = (float) ((centerX - tileX) * tileSize);
+        float centerShiftY = (float) ((centerY - tileY) * tileSize);
 
         float translateX = surfaceCenterX - centerShiftX;
         float translateY = surfaceCenterY - centerShiftY;
 
-        testKey.changeTo(mapZoom, tileX, tileY);
-        Integer textureId = tileCache.get(testKey);
+        glUseProgram(mapShader.programId);
+        glEnableVertexAttribArray(mapShader.vertexLoc);
 
-        if (textureId == null) {
-            mapComponent.tileLoader.requestTile(new MapTileKey(mapZoom, tileX, tileY));
-        } else {
-            glUseProgram(mapShader.programId);
-            glEnableVertexAttribArray(mapShader.vertexLoc);
+        glBindBuffer(GL_ARRAY_BUFFER, mapVbuffer);
+        glVertexAttribPointer(mapShader.vertexLoc, 2, GL_FLOAT, false, 0, 0);
 
-            glBindBuffer(GL_ARRAY_BUFFER, mapVbuffer);
-            glVertexAttribPointer(mapShader.vertexLoc, 2, GL_FLOAT, false, 0, 0);
+        Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, translateX, translateY, 0);
+        Matrix.scaleM(tmpMatrix, 0, scale, scale, 1);
+        glUniformMatrix4fv(mapShader.pvmLoc, 1, false, tmpMatrix, 0);
 
-            Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, translateX, translateY, 0);
-            Matrix.scaleM(tmpMatrix, 0, scale, scale, 1);
-            glUniformMatrix4fv(mapShader.pvmLoc, 1, false, tmpMatrix, 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, textureId);
 
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, textureId);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, mapVbufferCount);
 
-            glDrawArrays(GL_TRIANGLE_FAN, 0, mapVbufferCount);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glDisableVertexAttribArray(mapShader.vertexLoc);
+        glUseProgram(0);
+    }
 
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-            glDisableVertexAttribArray(mapShader.vertexLoc);
-            glUseProgram(0);
+    public void moveByPixels(float diffX, float diffY) {
+        double mercatorPixelSize = 1 / mercatorPixels();
+        posX += diffX * mercatorPixelSize;
+        posY += diffY * mercatorPixelSize;
+
+        while (posX < 0) {
+            posX++;
         }
+        while (posX > 1) {
+            posX--;
+        }
+
+        if (posY < 0) {
+            posY = 0;
+        } else if (posY > 1) {
+            posY = 1;
+        }
+
+        mapComponent.requestRender();
     }
 
     public void tileLoaded(MapTileKey key, int width, int height, ByteBuffer data) {
@@ -145,5 +198,9 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
         tileCache.put(key, textureId);
         mapComponent.requestRender();
+    }
+
+    private double mercatorPixels() {
+        return tileSize * Math.pow(2, zoom);
     }
 }
