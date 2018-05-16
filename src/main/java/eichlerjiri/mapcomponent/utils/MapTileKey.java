@@ -6,7 +6,14 @@ public class MapTileKey {
     public int x;
     public int y;
 
+    public MapTileKey() {
+    }
+
     public MapTileKey(int zoom, int x, int y) {
+        changeTo(zoom, x, y);
+    }
+
+    public void changeTo(int zoom, int x, int y) {
         this.zoom = zoom;
         this.x = x;
         this.y = y;
