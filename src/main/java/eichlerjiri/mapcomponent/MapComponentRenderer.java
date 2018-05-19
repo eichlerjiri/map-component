@@ -123,15 +123,15 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         Integer textureId = tileCache.get(testKey);
 
         if (textureId == null) {
-            mapComponent.tileLoader.requestTile(new MapTileKey(mapZoom, tileXreal, tileY));
+            mapComponent.tileLoader.requestTile(testKey);
             return;
         }
         if (textureId == 0) {
             return;
         }
 
-        float centerShiftX = (float) ((centerX - tileX) * tileSize);
-        float centerShiftY = (float) ((centerY - tileY) * tileSize);
+        float centerShiftX = (float) ((centerX - tileX) * scale);
+        float centerShiftY = (float) ((centerY - tileY) * scale);
 
         float translateX = surfaceCenterX - centerShiftX;
         float translateY = surfaceCenterY - centerShiftY;
@@ -176,6 +176,19 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         }
 
         mapComponent.requestRender();
+    }
+
+    public void changeZoom(float zoomChange, float centerX, float centerY) {
+        zoom += zoomChange;
+        if (zoom < 0) {
+            zoom = 0;
+        } else if (zoom > 20) {
+            zoom = 20;
+        }
+
+        float diffX = (centerX - surfaceCenterX) * zoomChange;
+        float diffY = (centerY - surfaceCenterY) * zoomChange;
+        moveByPixels(diffX, diffY);
     }
 
     public void tileLoaded(MapTileKey key, int width, int height, ByteBuffer data) {

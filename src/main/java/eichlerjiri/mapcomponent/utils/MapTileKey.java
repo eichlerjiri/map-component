@@ -9,8 +9,8 @@ public class MapTileKey {
     public MapTileKey() {
     }
 
-    public MapTileKey(int zoom, int x, int y) {
-        changeTo(zoom, x, y);
+    public MapTileKey(MapTileKey other) {
+        changeTo(other.zoom, other.x, other.y);
     }
 
     public void changeTo(int newZoom, int newX, int newY) {

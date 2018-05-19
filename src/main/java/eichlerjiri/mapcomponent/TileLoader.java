@@ -32,10 +32,12 @@ public class TileLoader extends ThreadPoolExecutor {
         cacheDir = c.getCacheDir();
     }
 
-    public void requestTile(final MapTileKey tileKey) {
-        if (requestedTiles.contains(tileKey)) {
+    public void requestTile(MapTileKey testTileKey) {
+        if (requestedTiles.contains(testTileKey)) {
             return;
         }
+
+        final MapTileKey tileKey = new MapTileKey(testTileKey);
         requestedTiles.add(tileKey);
 
         execute(new Runnable() {
