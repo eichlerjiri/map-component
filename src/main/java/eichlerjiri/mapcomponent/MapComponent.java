@@ -2,7 +2,6 @@ package eichlerjiri.mapcomponent;
 
 import android.content.Context;
 import android.opengl.GLSurfaceView;
-import android.util.Log;
 import android.view.MotionEvent;
 
 import java.util.ArrayList;
@@ -54,7 +53,10 @@ public class MapComponent extends GLSurfaceView {
                 lastY2 = Float.MIN_VALUE;
             }
         } else if (action == MotionEvent.ACTION_MOVE) {
-            float preDist = computeDistance();
+            float preX1 = lastX1;
+            float preY1 = lastY1;
+            float preX2 = lastX2;
+            float preY2 = lastY2;
 
             int pointerCount = event.getPointerCount();
             for (int i = 0; i < pointerCount; i++) {
@@ -64,15 +66,7 @@ public class MapComponent extends GLSurfaceView {
 
                 if (id == 0) {
                     if (lastX2 == Float.MIN_VALUE) {
-                        final float diffX = lastX1 - x;
-                        final float diffY = lastY1 - y;
-
-                        queueEvent(new Runnable() {
-                            @Override
-                            public void run() {
-                                renderer.moveByPixels(diffX, diffY);
-                            }
-                        });
+                        doMoveSingle(lastX1, lastY1, x, y);
                     }
 
                     lastX1 = x;
@@ -83,26 +77,34 @@ public class MapComponent extends GLSurfaceView {
                 }
             }
 
-            float postDist = computeDistance();
-
-            if (preDist != 0 && postDist != 0) {
-                float zoomChange = (postDist / preDist) - 1;
-                float centerX = (lastX1 + lastX2) / 2;
-                float centerY = (lastY1 + lastY2) / 2;
-                renderer.changeZoom(zoomChange, centerX, centerY);
+            if (lastX1 != Float.MIN_VALUE && lastX2 != Float.MIN_VALUE) {
+                doMoveDouble(preX1, preY1, preX2, preY2, lastX1, lastY1, lastX2, lastY2);
             }
         }
 
         return true;
     }
 
-    private float computeDistance() {
-        if (lastX1 == Float.MIN_VALUE || lastX2 == Float.MIN_VALUE) {
-            return 0;
-        }
-        float xDiff = Math.abs(lastX1 - lastX2);
-        float yDiff = Math.abs(lastY1 - lastY2);
-        return (float) Math.sqrt(xDiff * xDiff + yDiff * yDiff);
+    private void doMoveSingle(final float preX, final float preY,
+                              final float postX, final float postY) {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                renderer.moveSingle(preX, preY, postX, postY);
+            }
+        });
+    }
+
+    public void doMoveDouble(final float preX1, final float preY1,
+                             final float preX2, final float preY2,
+                             final float postX1, final float postY1,
+                             final float postX2, final float postY2) {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                renderer.moveDouble(preX1, preY1, preX2, preY2, postX1, postY1, postX2, postY2);
+            }
+        });
     }
 
     public void close() {
