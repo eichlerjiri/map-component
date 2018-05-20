@@ -6,6 +6,7 @@ import android.opengl.Matrix;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.HashMap;
+import java.util.Iterator;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -25,7 +26,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     public double posY = 0.5;
     public float zoom = 4.0f;
 
-    private final HashMap<MapTileKey, Integer> tileCache = new HashMap<>();
+    private final HashMap<MapTileKey, TileCacheItem> tileCache = new HashMap<>();
     private final MapTileKey testKey = new MapTileKey();
 
     private MapShader mapShader;
@@ -109,6 +110,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         }
 
         mapComponent.tileLoader.cancelUnused(tick);
+        removeUnused();
     }
 
     private void drawTile(int mapZoom, int tileX, int tileY, int tiles, double centerX, double centerY, float scale) {
@@ -125,13 +127,15 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         }
 
         testKey.changeTo(mapZoom, tileXreal, tileY);
-        Integer textureId = tileCache.get(testKey);
+        TileCacheItem cacheItem = tileCache.get(testKey);
 
-        if (textureId == null) {
+        if (cacheItem == null) {
             mapComponent.tileLoader.requestTile(testKey, tick);
             return;
         }
-        if (textureId == 0) {
+
+        cacheItem.tick = tick;
+        if (cacheItem.textureID == 0) {
             return;
         }
 
@@ -152,7 +156,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         glUniformMatrix4fv(mapShader.pvmLoc, 1, false, tmpMatrix, 0);
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, textureId);
+        glBindTexture(GL_TEXTURE_2D, cacheItem.textureID);
 
         glDrawArrays(GL_TRIANGLE_FAN, 0, mapVbufferCount);
 
@@ -178,7 +182,12 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
         float preDist = computeDistance(preX1, preY1, preX2, preY2);
         float postDist = computeDistance(postX1, postY1, postX2, postY2);
-        zoom += (postDist / preDist) - 1;
+        float diff = postDist / preDist;
+        if (diff != diff) { // NaN result
+            return;
+        }
+
+        zoom += Math.log(diff) / Math.log(2);
         normalizeZoom();
 
         double postMercatorPixelSize = 1 / mercatorPixels();
@@ -211,8 +220,8 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     private void normalizeZoom() {
         if (zoom < 0) {
             zoom = 0;
-        } else if (zoom > 20) {
-            zoom = 20;
+        } else if (zoom > 19) {
+            zoom = 19;
         }
     }
 
@@ -224,7 +233,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
     public void tileLoaded(MapTileKey key, int width, int height, ByteBuffer data) {
         if (data == null) {
-            tileCache.put(key, 0);
+            tileCache.put(key, new TileCacheItem(0, tick));
             return;
         }
 
@@ -237,14 +246,37 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        tileCache.put(key, textureId);
+        tileCache.put(key, new TileCacheItem(textureId, tick));
         mapComponent.requestRender();
     }
 
     private double mercatorPixels() {
         return tileSize * Math.pow(2, zoom);
+    }
+
+    private void removeUnused() {
+        Iterator<TileCacheItem> it = tileCache.values().iterator();
+        while (it.hasNext()) {
+            TileCacheItem item = it.next();
+            if (item.tick != tick) {
+                it.remove();
+            }
+        }
+    }
+
+    private class TileCacheItem {
+
+        public final int textureID;
+        public int tick;
+
+        public TileCacheItem(int textureID, int tick) {
+            this.textureID = textureID;
+            this.tick = tick;
+        }
     }
 }

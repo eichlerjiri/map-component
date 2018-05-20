@@ -1,6 +1,9 @@
 package eichlerjiri.mapcomponent;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.PixelFormat;
+import android.graphics.drawable.ColorDrawable;
 import android.opengl.GLSurfaceView;
 import android.view.MotionEvent;
 
@@ -19,6 +22,8 @@ public class MapComponent extends GLSurfaceView {
     public MapComponent(Context context, ArrayList<String> mapUrls) {
         super(context);
         tileLoader = new TileLoader(context, this, mapUrls);
+
+        setZOrderOnTop(true); // no black flash on load
 
         setEGLContextClientVersion(2);
         setRenderer(renderer);

@@ -8,20 +8,32 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
 
 public class IOUtils {
 
     public static byte[] download(String url) {
+        URLConnection conn = null;
         try {
-            InputStream is = new URL(url).openStream();
+            conn = new URL(url).openConnection();
+            InputStream is = conn.getInputStream();
             try {
                 return readAll(is);
             } finally {
-                is.close();
+                closeStream(is);
             }
         } catch (IOException e) {
             Log.e("IOUtils", "Cannot download file: " + url, e);
+            if (conn instanceof HttpURLConnection) {
+                InputStream es = ((HttpURLConnection) conn).getErrorStream();
+                if (es != null) {
+                    readAll(es);
+                    closeStream(es);
+                }
+            }
             return null;
         }
     }
@@ -32,7 +44,7 @@ public class IOUtils {
             try {
                 return readAll(fis);
             } finally {
-                fis.close();
+                closeStream(fis);
             }
         } catch (IOException e) {
             Log.e("IOUtils", "Cannot read file: " + file, e);
@@ -47,7 +59,7 @@ public class IOUtils {
                 fos.write(data);
                 return true;
             } finally {
-                fos.close();
+                closeStream(fos);
             }
         } catch (IOException e) {
             Log.e("IOUtils", "Cannot write file: " + file, e);
@@ -70,6 +82,22 @@ public class IOUtils {
         } catch (IOException e) {
             Log.e("IOUtils", "Cannot read stream", e);
             return null;
+        }
+    }
+
+    private static void closeStream(InputStream is) {
+        try {
+            is.close();
+        } catch (IOException e) {
+            Log.e("IOUtils", "Cannot close stream", e);
+        }
+    }
+
+    private static void closeStream(OutputStream os) {
+        try {
+            os.close();
+        } catch (IOException e) {
+            Log.e("IOUtils", "Cannot close stream", e);
         }
     }
 }

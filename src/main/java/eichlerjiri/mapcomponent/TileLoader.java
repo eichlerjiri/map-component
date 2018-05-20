@@ -26,7 +26,7 @@ public class TileLoader extends ThreadPoolExecutor {
     private final HashMap<MapTileKey, TileRunnable> requestedTiles = new HashMap<>();
 
     public TileLoader(Context c, MapComponent mapComponent, ArrayList<String> mapUrls) {
-        super(1, 1, 0L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+        super(10, 10, 0L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
 
         this.mapComponent = mapComponent;
         this.mapUrls = mapUrls;
