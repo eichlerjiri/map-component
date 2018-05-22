@@ -264,6 +264,10 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         while (it.hasNext()) {
             TileCacheItem item = it.next();
             if (item.tick != tick) {
+                if (item.textureID != 0) {
+                    itmp1[0] = item.textureID;
+                    glDeleteTextures(1, itmp1, 0);
+                }
                 it.remove();
             }
         }
