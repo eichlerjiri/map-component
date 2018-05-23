@@ -11,7 +11,9 @@ import java.util.Iterator;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
+import eichlerjiri.mapcomponent.shaders.ColorShader;
 import eichlerjiri.mapcomponent.shaders.MapShader;
+import eichlerjiri.mapcomponent.utils.CurrentPosition;
 import eichlerjiri.mapcomponent.utils.MapTileKey;
 
 import static android.opengl.GLES20.*;
@@ -21,25 +23,42 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     private static final float tileSize = 256.0f;
 
     private final MapComponent mapComponent;
+    private final float scaledDensity;
 
-    public double posX = 0.5;
-    public double posY = 0.5;
-    public float zoom = 4.0f;
+    private double posX = 0.5;
+    private double posY = 0.5;
+    private float zoom;
+
+    public CurrentPosition currentPosition;
 
     private final HashMap<MapTileKey, TileCacheItem> tileCache = new HashMap<>();
     private final MapTileKey testKey = new MapTileKey();
 
     private MapShader mapShader;
+    private ColorShader colorShader;
     private int mapVbuffer;
     private int mapVbufferCount;
+    private int currentPositionVbuffer;
+    private int currentPositionVbufferCount;
 
     private int w;
     private int h;
+
+    // zoom-related values
+    private int mapZoom;
+    private int tiles;
+    private double tilesReversed;
+    private double mercatorPixels;
+    private double mercatorPixelSize;
+    private float scale;
+
+    // screen-size related values
     private float surfaceCenterX;
     private float surfaceCenterY;
     private int searchDist;
     private final float[] mapMatrix = new float[16];
 
+    // tmps
     private final int[] itmp1 = new int[1];
     private final float[] tmpMatrix = new float[16];
 
@@ -47,6 +66,23 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
     public MapComponentRenderer(MapComponent mapComponent) {
         this.mapComponent = mapComponent;
+        scaledDensity = mapComponent.getContext().getResources().getDisplayMetrics().scaledDensity;
+
+        refreshScreenSizeValues();
+        refreshZoomValues();
+    }
+
+    public void setPosition(double x, double y, float newZoom) {
+        setZoom(newZoom);
+        setPos(x, y);
+
+        mapComponent.requestRender();
+    }
+
+    public void setCurrentPosition(CurrentPosition currentPosition) {
+        this.currentPosition = currentPosition;
+
+        mapComponent.requestRender();
     }
 
     @Override
@@ -67,6 +103,9 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         mapVbufferCount = data.length / 2;
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        colorShader = null;
+        currentPositionVbuffer = 0;
     }
 
     @Override
@@ -75,24 +114,14 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
         w = width;
         h = height;
-        surfaceCenterX = width * 0.5f;
-        surfaceCenterY = height * 0.5f;
 
-        int tilesNecessaryBase = (int) (Math.sqrt(width * width + height * height) / tileSize);
-        searchDist = (tilesNecessaryBase + 1) / 2;
-
-        Matrix.orthoM(mapMatrix, 0, 0, width, height, 0, -10, 10);
+        refreshScreenSizeValues();
     }
 
     @Override
     public void onDrawFrame(GL10 gl) {
         tick++;
         glClear(GL_COLOR_BUFFER_BIT);
-
-        int mapZoom = (int) zoom;
-        int tiles = 1 << mapZoom;
-
-        float scale = (float) (mercatorPixels() / tiles);
 
         double centerX = tiles * posX;
         double centerY = tiles * posY;
@@ -105,15 +134,19 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
         for (int i = centerTileX - searchDist; i <= centerTileX + searchDist; i++) {
             for (int j = centerTileY - searchDist; j <= centerTileY + searchDist; j++) {
-                drawTile(mapZoom, i, j, tiles, centerX, centerY, scale);
+                drawTile(i, j);
             }
+        }
+
+        if (currentPosition != null) {
+            drawCurrentPosition();
         }
 
         mapComponent.tileLoader.cancelUnused(tick);
         removeUnused();
     }
 
-    private void drawTile(int mapZoom, int tileX, int tileY, int tiles, double centerX, double centerY, float scale) {
+    private void drawTile(int tileX, int tileY) {
         if (tileY < 0 || tileY >= tiles) {
             return;
         }
@@ -126,7 +159,9 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             tileXreal -= tiles;
         }
 
-        testKey.changeTo(mapZoom, tileXreal, tileY);
+        testKey.zoom = mapZoom;
+        testKey.x = tileXreal;
+        testKey.y = tileY;
         TileCacheItem cacheItem = tileCache.get(testKey);
 
         if (cacheItem == null) {
@@ -139,11 +174,8 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             return;
         }
 
-        float centerShiftX = (float) ((centerX - tileX) * scale);
-        float centerShiftY = (float) ((centerY - tileY) * scale);
-
-        float translateX = surfaceCenterX - centerShiftX;
-        float translateY = surfaceCenterY - centerShiftY;
+        float translateX = translateX(tileX * tilesReversed);
+        float translateY = translateY(tileY * tilesReversed);
 
         glUseProgram(mapShader.programId);
         glEnableVertexAttribArray(mapShader.vertexLoc);
@@ -166,19 +198,68 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         glUseProgram(0);
     }
 
-    public void moveSingle(float preX, float preY, float postX, float postY) {
-        double mercatorPixelSize = 1 / mercatorPixels();
+    private void drawCurrentPosition() {
+        if (colorShader == null) {
+            colorShader = new ColorShader();
+        }
+        if (currentPositionVbuffer == 0) {
+            glGenBuffers(1, itmp1, 0);
+            currentPositionVbuffer = itmp1[0];
 
-        posX += (preX - postX) * mercatorPixelSize;
-        posY += (preY - postY) * mercatorPixelSize;
-        normalizePos();
+            glBindBuffer(GL_ARRAY_BUFFER, currentPositionVbuffer);
+
+            float[] data = new float[]{-10, 10, 0, -3, 0, -10, 10, 10, 0, -3, 0, -10};
+            for (int i = 0; i < data.length; i++) {
+                data[i] *= scaledDensity;
+            }
+
+            glBufferData(GL_ARRAY_BUFFER, data.length * 4, FloatBuffer.wrap(data), GL_STATIC_DRAW);
+            currentPositionVbufferCount = data.length / 2;
+
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+
+        float translateX = translateX(currentPosition.x);
+        float translateY = translateY(currentPosition.y);
+
+        glUseProgram(colorShader.programId);
+        glEnableVertexAttribArray(colorShader.vertexLoc);
+
+        glBindBuffer(GL_ARRAY_BUFFER, currentPositionVbuffer);
+        glVertexAttribPointer(colorShader.vertexLoc, 2, GL_FLOAT, false, 0, 0);
+
+        glUniform4f(colorShader.colorLoc, 0, 0, 1, 1);
+
+        Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, translateX, translateY, 0);
+        Matrix.rotateM(tmpMatrix, 0, currentPosition.azimuth, 0, 0, 1);
+        glUniformMatrix4fv(colorShader.pvmLoc, 1, false, tmpMatrix, 0);
+
+        glDrawArrays(GL_TRIANGLES, 0, currentPositionVbufferCount);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glDisableVertexAttribArray(colorShader.vertexLoc);
+        glUseProgram(0);
+    }
+
+    public void moveSingle(float preX, float preY, float postX, float postY) {
+        double x = posX + (preX - postX) * mercatorPixelSize;
+        double y = posY + (preY - postY) * mercatorPixelSize;
+        setPos(x, y);
 
         mapComponent.requestRender();
     }
 
+    private float translateX(double mercatorX) {
+        return surfaceCenterX + (float) ((mercatorX - posX) * mercatorPixels);
+    }
+
+    private float translateY(double mercatorY) {
+        return surfaceCenterY + (float) ((mercatorY - posY) * mercatorPixels);
+    }
+
     public void moveDouble(float preX1, float preY1, float preX2, float preY2,
                            float postX1, float postY1, float postX2, float postY2) {
-        double preMercatorPixelSize = 1 / mercatorPixels();
+        double preMercatorPixelSize = mercatorPixelSize;
 
         float preDist = computeDistance(preX1, preY1, preX2, preY2);
         float postDist = computeDistance(postX1, postY1, postX2, postY2);
@@ -187,42 +268,45 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             return;
         }
 
-        zoom += Math.log(diff) / Math.log(2);
-        normalizeZoom();
-
-        double postMercatorPixelSize = 1 / mercatorPixels();
+        setZoom(zoom + (float) (Math.log(diff) / Math.log(2)));
 
         double posX1 = posX + (preX1 - surfaceCenterX) * preMercatorPixelSize;
         double posY1 = posY + (preY1 - surfaceCenterY) * preMercatorPixelSize;
 
-        posX = posX1 - (postX1 - surfaceCenterX) * postMercatorPixelSize;
-        posY = posY1 - (postY1 - surfaceCenterY) * postMercatorPixelSize;
-        normalizePos();
+        double posX2 = posX1 - (postX1 - surfaceCenterX) * mercatorPixelSize;
+        double posY2 = posY1 - (postY1 - surfaceCenterY) * mercatorPixelSize;
+        setPos(posX2, posY2);
 
         mapComponent.requestRender();
     }
 
-    private void normalizePos() {
-        while (posX < 0) {
-            posX++;
+    private void setPos(double x, double y) {
+        while (x < 0) {
+            x++;
         }
-        while (posX > 1) {
-            posX--;
+        while (x > 1) {
+            x--;
         }
 
-        if (posY < 0) {
-            posY = 0;
-        } else if (posY > 1) {
-            posY = 1;
+        if (y < 0) {
+            y = 0;
+        } else if (y > 1) {
+            y = 1;
         }
+
+        posX = x;
+        posY = y;
     }
 
-    private void normalizeZoom() {
-        if (zoom < 0) {
-            zoom = 0;
-        } else if (zoom > 19) {
-            zoom = 19;
+    private void setZoom(float newZoom) {
+        if (newZoom < 0) {
+            newZoom = 0;
+        } else if (newZoom > 19) {
+            newZoom = 19;
         }
+
+        zoom = newZoom;
+        refreshZoomValues();
     }
 
     private float computeDistance(float x1, float y1, float x2, float y2) {
@@ -255,10 +339,6 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         mapComponent.requestRender();
     }
 
-    private double mercatorPixels() {
-        return tileSize * Math.pow(2, zoom);
-    }
-
     private void removeUnused() {
         Iterator<TileCacheItem> it = tileCache.values().iterator();
         while (it.hasNext()) {
@@ -271,6 +351,29 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
                 it.remove();
             }
         }
+    }
+
+    private void refreshScreenSizeValues() {
+        surfaceCenterX = w * 0.5f;
+        surfaceCenterY = h * 0.5f;
+
+        int tilesNecessaryBase = (int) (Math.sqrt(w * w + h * h) / tileSize);
+        searchDist = (tilesNecessaryBase + 1) / 2;
+
+        if (w != 0 & h != 0) {
+            Matrix.orthoM(mapMatrix, 0, 0, w, h, 0, -10, 10);
+        } else {
+            Matrix.setIdentityM(mapMatrix, 0);
+        }
+    }
+
+    private void refreshZoomValues() {
+        mapZoom = (int) zoom;
+        tiles = 1 << mapZoom;
+        tilesReversed = 1 / (double) tiles;
+        mercatorPixels = tileSize * Math.pow(2, zoom);
+        mercatorPixelSize = 1 / mercatorPixels;
+        scale = (float) (mercatorPixels * tilesReversed);
     }
 
     private class TileCacheItem {

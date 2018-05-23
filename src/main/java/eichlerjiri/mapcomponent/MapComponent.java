@@ -1,13 +1,14 @@
 package eichlerjiri.mapcomponent;
 
 import android.content.Context;
-import android.graphics.Color;
-import android.graphics.PixelFormat;
-import android.graphics.drawable.ColorDrawable;
+import android.location.Location;
 import android.opengl.GLSurfaceView;
 import android.view.MotionEvent;
 
 import java.util.ArrayList;
+
+import eichlerjiri.mapcomponent.utils.CurrentPosition;
+import eichlerjiri.mapcomponent.utils.MercatorUtils;
 
 public class MapComponent extends GLSurfaceView {
 
@@ -18,6 +19,8 @@ public class MapComponent extends GLSurfaceView {
     private float lastY1 = Float.MIN_VALUE;
     private float lastX2 = Float.MIN_VALUE;
     private float lastY2 = Float.MIN_VALUE;
+    private boolean centered;
+    public float centeringZoom;
 
     public MapComponent(Context context, ArrayList<String> mapUrls) {
         super(context);
@@ -28,6 +31,31 @@ public class MapComponent extends GLSurfaceView {
         setEGLContextClientVersion(2);
         setRenderer(renderer);
         setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+    }
+
+    public void setCurrentPosition(Location location) {
+        if (location != null) {
+            double x = MercatorUtils.lonToMercatorX(location.getLongitude());
+            double y = MercatorUtils.latToMercatorY(location.getLatitude());
+            renderer.setCurrentPosition(new CurrentPosition(x, y, location.getBearing()));
+
+            if (centered) {
+                renderer.setPosition(x, y, centeringZoom);
+            }
+        } else {
+            renderer.setCurrentPosition(null);
+        }
+    }
+
+    public void moveTo(double lat, double lon, float zoom) {
+        renderer.setPosition(MercatorUtils.lonToMercatorX(lon), MercatorUtils.latToMercatorY(lat), zoom);
+    }
+
+    public void startCentering() {
+        centered = true;
+        if (renderer.currentPosition != null) {
+            renderer.setPosition(renderer.currentPosition.x, renderer.currentPosition.y, centeringZoom);
+        }
     }
 
     @Override
@@ -92,6 +120,7 @@ public class MapComponent extends GLSurfaceView {
 
     private void doMoveSingle(final float preX, final float preY,
                               final float postX, final float postY) {
+        centered = false;
         queueEvent(new Runnable() {
             @Override
             public void run() {
@@ -100,10 +129,11 @@ public class MapComponent extends GLSurfaceView {
         });
     }
 
-    public void doMoveDouble(final float preX1, final float preY1,
-                             final float preX2, final float preY2,
-                             final float postX1, final float postY1,
-                             final float postX2, final float postY2) {
+    private void doMoveDouble(final float preX1, final float preY1,
+                              final float preX2, final float preY2,
+                              final float postX1, final float postY1,
+                              final float postX2, final float postY2) {
+        centered = false;
         queueEvent(new Runnable() {
             @Override
             public void run() {
