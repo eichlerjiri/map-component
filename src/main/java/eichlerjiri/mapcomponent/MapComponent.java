@@ -6,14 +6,18 @@ import android.opengl.GLSurfaceView;
 import android.view.MotionEvent;
 
 import java.util.ArrayList;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import eichlerjiri.mapcomponent.utils.CurrentPosition;
 import eichlerjiri.mapcomponent.utils.MercatorUtils;
+import eichlerjiri.mapcomponent.utils.Position;
 
 public class MapComponent extends GLSurfaceView {
 
     public final MapComponentRenderer renderer = new MapComponentRenderer(this);
     public final TileLoader tileLoader;
+
+    public final ConcurrentLinkedQueue<Runnable> onDrawRunnables = new ConcurrentLinkedQueue<>();
 
     private float lastX1 = Float.MIN_VALUE;
     private float lastY1 = Float.MIN_VALUE;
@@ -37,25 +41,44 @@ public class MapComponent extends GLSurfaceView {
         if (location != null) {
             double x = MercatorUtils.lonToMercatorX(location.getLongitude());
             double y = MercatorUtils.latToMercatorY(location.getLatitude());
-            renderer.setCurrentPosition(new CurrentPosition(x, y, location.getBearing()));
+            doSetCurrentPosition(new CurrentPosition(x, y, location.getBearing()));
 
             if (centered) {
-                renderer.setPosition(x, y, centeringZoom);
+                doSetPosition(x, y, centeringZoom);
             }
         } else {
-            renderer.setCurrentPosition(null);
+            doSetCurrentPosition(null);
+        }
+    }
+
+    public void setStartPosition(double lat, double lon) {
+        if (lat == Double.MIN_VALUE) {
+            doSetStartPosition(null);
+        } else {
+            doSetStartPosition(new Position(MercatorUtils.lonToMercatorX(lon), MercatorUtils.latToMercatorY(lat)));
+        }
+    }
+
+    public void setEndPosition(double lat, double lon) {
+        if (lat == Double.MIN_VALUE) {
+            doSetEndPosition(null);
+        } else {
+            doSetEndPosition(new Position(MercatorUtils.lonToMercatorX(lon), MercatorUtils.latToMercatorY(lat)));
         }
     }
 
     public void moveTo(double lat, double lon, float zoom) {
-        renderer.setPosition(MercatorUtils.lonToMercatorX(lon), MercatorUtils.latToMercatorY(lat), zoom);
+        doSetPosition(MercatorUtils.lonToMercatorX(lon), MercatorUtils.latToMercatorY(lat), zoom);
     }
 
     public void startCentering() {
         centered = true;
-        if (renderer.currentPosition != null) {
-            renderer.setPosition(renderer.currentPosition.x, renderer.currentPosition.y, centeringZoom);
-        }
+        doCenterPosition();
+    }
+
+    public void queueEventOnDraw(Runnable runnable) {
+        onDrawRunnables.add(runnable);
+        requestRender();
     }
 
     @Override
@@ -99,6 +122,7 @@ public class MapComponent extends GLSurfaceView {
 
                 if (id == 0) {
                     if (lastX2 == Float.MIN_VALUE) {
+                        centered = false;
                         doMoveSingle(lastX1, lastY1, x, y);
                     }
 
@@ -111,6 +135,7 @@ public class MapComponent extends GLSurfaceView {
             }
 
             if (lastX1 != Float.MIN_VALUE && lastX2 != Float.MIN_VALUE) {
+                centered = false;
                 doMoveDouble(preX1, preY1, preX2, preY2, lastX1, lastY1, lastX2, lastY2);
             }
         }
@@ -118,9 +143,7 @@ public class MapComponent extends GLSurfaceView {
         return true;
     }
 
-    private void doMoveSingle(final float preX, final float preY,
-                              final float postX, final float postY) {
-        centered = false;
+    private void doMoveSingle(final float preX, final float preY, final float postX, final float postY) {
         queueEvent(new Runnable() {
             @Override
             public void run() {
@@ -129,15 +152,59 @@ public class MapComponent extends GLSurfaceView {
         });
     }
 
-    private void doMoveDouble(final float preX1, final float preY1,
-                              final float preX2, final float preY2,
-                              final float postX1, final float postY1,
-                              final float postX2, final float postY2) {
-        centered = false;
+    private void doMoveDouble(final float preX1, final float preY1, final float preX2, final float preY2,
+                              final float postX1, final float postY1, final float postX2, final float postY2) {
         queueEvent(new Runnable() {
             @Override
             public void run() {
                 renderer.moveDouble(preX1, preY1, preX2, preY2, postX1, postY1, postX2, postY2);
+            }
+        });
+    }
+
+    private void doSetPosition(final double x, final double y, final float zoom) {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                renderer.setPosition(x, y, zoom);
+            }
+        });
+    }
+
+    private void doCenterPosition() {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                if (renderer.currentPosition != null) {
+                    renderer.setPosition(renderer.currentPosition.x, renderer.currentPosition.y, centeringZoom);
+                }
+            }
+        });
+    }
+
+    private void doSetCurrentPosition(final CurrentPosition position) {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                renderer.setCurrentPosition(position);
+            }
+        });
+    }
+
+    private void doSetStartPosition(final Position startPosition) {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                renderer.setStartPosition(startPosition);
+            }
+        });
+    }
+
+    private void doSetEndPosition(final Position endPosition) {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                renderer.setEndPosition(endPosition);
             }
         });
     }

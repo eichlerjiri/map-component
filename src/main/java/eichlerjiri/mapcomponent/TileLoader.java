@@ -21,6 +21,7 @@ public class TileLoader extends ThreadPoolExecutor {
 
     private final MapComponent mapComponent;
     private final ArrayList<String> mapUrls;
+    private final ThreadLocal<String> serverUrl = new ThreadLocal<>();
     private final File cacheDir;
     private final HashMap<MapTileKey, TileRunnable> requestedTiles = new HashMap<>();
 
@@ -35,7 +36,8 @@ public class TileLoader extends ThreadPoolExecutor {
     public void requestTile(MapTileKey testTileKey, int tick) {
         TileRunnable previousRunnable = requestedTiles.get(testTileKey);
         if (previousRunnable != null) {
-            previousRunnable.tick(tick);
+            previousRunnable.tick = tick;
+            previousRunnable.cancelled = false;
             return;
         }
 
@@ -62,8 +64,13 @@ public class TileLoader extends ThreadPoolExecutor {
             data = IOUtils.readFile(cacheFile);
         }
         if (data == null) {
-            String url = mapUrls.get(new Random().nextInt(mapUrls.size())) +
-                tileKey.zoom + "/" + tileKey.x + "/" + tileKey.y + ".png";
+            String serverUrlStr = serverUrl.get();
+            if (serverUrlStr == null) {
+                serverUrlStr = mapUrls.get(new Random().nextInt(mapUrls.size()));
+                serverUrl.set(serverUrlStr);
+            }
+
+            String url = serverUrlStr + tileKey.zoom + "/" + tileKey.x + "/" + tileKey.y + ".png";
             Log.i("TileLoader", "Downloading: " + url);
             data = IOUtils.download(url);
         }
@@ -103,7 +110,7 @@ public class TileLoader extends ThreadPoolExecutor {
     }
 
     private void returnTile(final MapTileKey tileKey, final int width, final int height, final ByteBuffer data) {
-        mapComponent.queueEvent(new Runnable() {
+        mapComponent.queueEventOnDraw(new Runnable() {
             @Override
             public void run() {
                 TileRunnable tileRunnable = requestedTiles.remove(tileKey);
@@ -135,11 +142,6 @@ public class TileLoader extends ThreadPoolExecutor {
 
         public TileRunnable(MapTileKey tileKey, int tick) {
             this.tileKey = tileKey;
-            this.tick = tick;
-        }
-
-        public void tick(int tick) {
-            cancelled = false;
             this.tick = tick;
         }
 

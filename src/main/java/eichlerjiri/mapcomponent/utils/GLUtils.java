@@ -1,5 +1,7 @@
 package eichlerjiri.mapcomponent.utils;
 
+import java.nio.FloatBuffer;
+
 import static android.opengl.GLES20.*;
 
 public class GLUtils {
@@ -22,5 +24,16 @@ public class GLUtils {
         glCompileShader(shaderId);
 
         return shaderId;
+    }
+
+    public static int prepareBuffer(float[] data, int[] itmp1) {
+        glGenBuffers(1, itmp1, 0);
+        int id = itmp1[0];
+
+        glBindBuffer(GL_ARRAY_BUFFER, id);
+        glBufferData(GL_ARRAY_BUFFER, data.length * 4, FloatBuffer.wrap(data), GL_STATIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        return id;
     }
 }

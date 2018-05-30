@@ -21,11 +21,11 @@ public class ColorShader {
             "    gl_FragColor = color;\n" +
             "}\n";
 
-    public final int programId;
+    private final int programId;
 
-    public final int vertexLoc;
-    public final int pvmLoc;
-    public final int colorLoc;
+    private final int vertexLoc;
+    private final int pvmLoc;
+    private final int colorLoc;
 
     public ColorShader() {
         programId = GLUtils.createProgram(vertexShaderSource, fragmentShaderSource);
@@ -33,5 +33,23 @@ public class ColorShader {
         vertexLoc = glGetAttribLocation(programId, "vertex");
         pvmLoc = glGetUniformLocation(programId, "pvm");
         colorLoc = glGetUniformLocation(programId, "color");
+    }
+
+    public void render(float[] pvm, int buffer, int bufferCount, float r, float g, float b, float a) {
+        glUseProgram(programId);
+        glEnableVertexAttribArray(vertexLoc);
+
+        glBindBuffer(GL_ARRAY_BUFFER, buffer);
+        glVertexAttribPointer(vertexLoc, 2, GL_FLOAT, false, 0, 0);
+
+        glUniform4f(colorLoc, r, g, b, a);
+
+        glUniformMatrix4fv(pvmLoc, 1, false, pvm, 0);
+
+        glDrawArrays(GL_TRIANGLES, 0, bufferCount);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glDisableVertexAttribArray(vertexLoc);
+        glUseProgram(0);
     }
 }
