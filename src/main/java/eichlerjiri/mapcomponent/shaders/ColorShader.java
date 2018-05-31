@@ -35,7 +35,7 @@ public class ColorShader {
         colorLoc = glGetUniformLocation(programId, "color");
     }
 
-    public void render(float[] pvm, int buffer, int bufferCount, float r, float g, float b, float a) {
+    public void render(float[] pvm, int buffer, int bufferCount, int drawType, float r, float g, float b, float a) {
         glUseProgram(programId);
         glEnableVertexAttribArray(vertexLoc);
 
@@ -46,7 +46,7 @@ public class ColorShader {
 
         glUniformMatrix4fv(pvmLoc, 1, false, pvm, 0);
 
-        glDrawArrays(GL_TRIANGLES, 0, bufferCount);
+        glDrawArrays(drawType, 0, bufferCount);
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glDisableVertexAttribArray(vertexLoc);

@@ -4,6 +4,7 @@ import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 
 import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 
@@ -13,6 +14,7 @@ import javax.microedition.khronos.opengles.GL10;
 import eichlerjiri.mapcomponent.shaders.ColorShader;
 import eichlerjiri.mapcomponent.shaders.MapShader;
 import eichlerjiri.mapcomponent.utils.CurrentPosition;
+import eichlerjiri.mapcomponent.utils.FloatArrayList;
 import eichlerjiri.mapcomponent.utils.GLUtils;
 import eichlerjiri.mapcomponent.utils.MapTileKey;
 import eichlerjiri.mapcomponent.utils.Position;
@@ -21,7 +23,7 @@ import static android.opengl.GLES20.*;
 
 public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
-    private static final float tileSize = 256.0f;
+    public static final float tileSize = 256.0f;
 
     private final MapComponent mapComponent;
     private final float scaledDensity;
@@ -33,6 +35,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     public CurrentPosition currentPosition;
     public Position startPosition;
     public Position endPosition;
+    public double[] path;
 
     private final HashMap<MapTileKey, TileCacheItem> tileCache = new HashMap<>();
     private final MapTileKey testKey = new MapTileKey();
@@ -45,6 +48,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     private int currentPositionVbufferCount;
     private int positionVbuffer;
     private int positionVbufferCount;
+    private int pathVbuffer;
 
     private int w;
     private int h;
@@ -65,6 +69,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
     // tmps
     private final int[] itmp1 = new int[1];
+    private final FloatArrayList fltmp1 = new FloatArrayList();
     private final float[] tmpMatrix = new float[16];
 
     private int tick;
@@ -98,6 +103,11 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         mapComponent.requestRender();
     }
 
+    public void setPath(double[] path) {
+        this.path = path;
+        mapComponent.requestRender();
+    }
+
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
         glClearColor(0.8f, 0.97f, 1.0f, 1.0f);
@@ -107,12 +117,13 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         mapShader = new MapShader();
 
         float[] mapBufferData = new float[]{0, 0, 0, 1, 1, 1, 1, 0};
-        mapVbuffer = GLUtils.prepareBuffer(mapBufferData, itmp1);
+        mapVbuffer = GLUtils.prepareStaticBuffer(mapBufferData, itmp1);
         mapVbufferCount = mapBufferData.length / 2;
 
         colorShader = null;
         currentPositionVbuffer = 0;
         positionVbuffer = 0;
+        pathVbuffer = 0;
     }
 
     @Override
@@ -153,6 +164,17 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             }
         }
 
+        if (path != null) {
+            if (pathVbuffer == 0) {
+                glGenBuffers(1, itmp1, 0);
+                pathVbuffer = itmp1[0];
+            }
+            drawPath();
+        } else if (pathVbuffer != 0) {
+            itmp1[0] = pathVbuffer;
+            glDeleteBuffers(1, itmp1, 0);
+            pathVbuffer = 0;
+        }
         if (startPosition != null) {
             drawPosition(startPosition, 0, 1, 0, 1);
         }
@@ -200,7 +222,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, translateX, translateY, 0);
         Matrix.scaleM(tmpMatrix, 0, scale, scale, 1);
 
-        mapShader.render(tmpMatrix, mapVbuffer, mapVbufferCount, cacheItem.textureID);
+        mapShader.render(tmpMatrix, mapVbuffer, mapVbufferCount, cacheItem.textureID, GL_TRIANGLE_FAN);
     }
 
     private void drawCurrentPosition() {
@@ -212,7 +234,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             for (int i = 0; i < data.length; i++) {
                 data[i] *= scaledDensity;
             }
-            currentPositionVbuffer = GLUtils.prepareBuffer(data, itmp1);
+            currentPositionVbuffer = GLUtils.prepareStaticBuffer(data, itmp1);
             currentPositionVbufferCount = data.length / 2;
         }
 
@@ -221,7 +243,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, translateX, translateY, 0);
         Matrix.rotateM(tmpMatrix, 0, currentPosition.azimuth, 0, 0, 1);
 
-        colorShader.render(tmpMatrix, currentPositionVbuffer, currentPositionVbufferCount, 0, 0, 1, 1);
+        colorShader.render(tmpMatrix, currentPositionVbuffer, currentPositionVbufferCount, GL_TRIANGLES, 0, 0, 1, 1);
     }
 
     private void drawPosition(Position position, float r, float g, float b, float a) {
@@ -233,7 +255,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             for (int i = 0; i < data.length; i++) {
                 data[i] *= scaledDensity;
             }
-            positionVbuffer = GLUtils.prepareBuffer(data, itmp1);
+            positionVbuffer = GLUtils.prepareStaticBuffer(data, itmp1);
             positionVbufferCount = data.length / 2;
         }
 
@@ -241,7 +263,50 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         float translateY = translateY(position.y);
         Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, translateX, translateY, 0);
 
-        colorShader.render(tmpMatrix, positionVbuffer, positionVbufferCount, r, g, b, a);
+        colorShader.render(tmpMatrix, positionVbuffer, positionVbufferCount, GL_TRIANGLES, r, g, b, a);
+    }
+
+    private void drawPath() {
+        if (colorShader == null) {
+            colorShader = new ColorShader();
+        }
+
+        for (int i = 2; i < path.length; i += 2) {
+            float tx1 = translateX(path[i - 2]);
+            float ty1 = translateY(path[i - 1]);
+            float tx2 = translateX(path[i]);
+            float ty2 = translateY(path[i + 1]);
+
+            float vx = tx2 - tx1;
+            float vy = ty2 - ty1;
+
+            float norm = 1 / (float) Math.sqrt(vx * vx + vy * vy);
+            vx *= norm;
+            vy *= norm;
+
+            float tx11 = tx1 + vy * 3;
+            float ty11 = ty1 - vx * 3;
+            float tx12 = tx1 - vy * 3;
+            float ty12 = ty1 + vx * 3;
+            float tx21 = tx2 + vy * 3;
+            float ty21 = ty2 - vx * 3;
+            float tx22 = tx2 - vy * 3;
+            float ty22 = ty2 + vx * 3;
+
+            fltmp1.add(tx11, ty11, tx12, ty12, tx21, ty21, tx12, ty12, tx21, ty21, tx22, ty22);
+        }
+
+        if (fltmp1.size == 0) {
+            return;
+        }
+
+        glBindBuffer(GL_ARRAY_BUFFER, pathVbuffer);
+        glBufferData(GL_ARRAY_BUFFER, fltmp1.size * 4, FloatBuffer.wrap(fltmp1.data, 0, fltmp1.size), GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        colorShader.render(mapMatrix, pathVbuffer, fltmp1.size / 2, GL_TRIANGLES, 0, 0, 0, 1);
+
+        fltmp1.clear();
     }
 
     public void moveSingle(float preX, float preY, float postX, float postY) {

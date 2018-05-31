@@ -36,7 +36,7 @@ public class MapShader {
         pvmLoc = glGetUniformLocation(programId, "pvm");
     }
 
-    public void render(float[] pvm, int buffer, int bufferCount, int texture) {
+    public void render(float[] pvm, int buffer, int bufferCount, int texture, int drawType) {
         glUseProgram(programId);
         glEnableVertexAttribArray(vertexLoc);
 
@@ -48,7 +48,7 @@ public class MapShader {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
 
-        glDrawArrays(GL_TRIANGLE_FAN, 0, bufferCount);
+        glDrawArrays(drawType, 0, bufferCount);
 
         glBindTexture(GL_TEXTURE_2D, 0);
         glBindBuffer(GL_ARRAY_BUFFER, 0);

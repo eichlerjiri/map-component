@@ -8,7 +8,10 @@ import android.view.MotionEvent;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import eichlerjiri.mapcomponent.utils.AndroidUtils;
 import eichlerjiri.mapcomponent.utils.CurrentPosition;
+import eichlerjiri.mapcomponent.utils.DoubleArrayList;
+import eichlerjiri.mapcomponent.utils.GeoBoundary;
 import eichlerjiri.mapcomponent.utils.MercatorUtils;
 import eichlerjiri.mapcomponent.utils.Position;
 
@@ -23,8 +26,8 @@ public class MapComponent extends GLSurfaceView {
     private float lastY1 = Float.MIN_VALUE;
     private float lastX2 = Float.MIN_VALUE;
     private float lastY2 = Float.MIN_VALUE;
-    private boolean centered;
-    public float centeringZoom;
+
+    public boolean centered;
 
     public MapComponent(Context context, ArrayList<String> mapUrls) {
         super(context);
@@ -42,10 +45,6 @@ public class MapComponent extends GLSurfaceView {
             double x = MercatorUtils.lonToMercatorX(location.getLongitude());
             double y = MercatorUtils.latToMercatorY(location.getLatitude());
             doSetCurrentPosition(new CurrentPosition(x, y, location.getBearing()));
-
-            if (centered) {
-                doSetPosition(x, y, centeringZoom);
-            }
         } else {
             doSetCurrentPosition(null);
         }
@@ -67,13 +66,51 @@ public class MapComponent extends GLSurfaceView {
         }
     }
 
+    public void setPath(DoubleArrayList positions) {
+        if (positions == null) {
+            doSetPath(null);
+        } else {
+            double[] mercatorPos = new double[positions.size];
+            for (int i = 0; i < positions.size; i += 2) {
+                mercatorPos[i] = MercatorUtils.lonToMercatorX(positions.data[i + 1]);
+                mercatorPos[i + 1] = MercatorUtils.latToMercatorY(positions.data[i]);
+            }
+            doSetPath(mercatorPos);
+        }
+    }
+
     public void moveTo(double lat, double lon, float zoom) {
         doSetPosition(MercatorUtils.lonToMercatorX(lon), MercatorUtils.latToMercatorY(lat), zoom);
     }
 
-    public void startCentering() {
-        centered = true;
-        doCenterPosition();
+    public void moveToBoundary(GeoBoundary geoBoundary, float viewWidth, float viewHeight,
+                               float defaultZoom, float padding) {
+        double x1 = MercatorUtils.lonToMercatorX(geoBoundary.minLon);
+        double y1 = MercatorUtils.latToMercatorY(geoBoundary.minLat);
+        double x2 = MercatorUtils.lonToMercatorX(geoBoundary.maxLon);
+        double y2 = MercatorUtils.latToMercatorY(geoBoundary.maxLat);
+
+        double diffX = x2 - x1;
+        double diffY = y1 - y2;
+
+        float pixPadding = AndroidUtils.spToPix(getContext(), padding * 2);
+        if (viewWidth - pixPadding > 0) {
+            viewWidth -= pixPadding;
+        }
+        if (viewHeight - pixPadding > 0) {
+            viewHeight -= pixPadding;
+        }
+
+        double log2 = 1 / Math.log(2);
+        double zoomX = Math.log(viewWidth / (MapComponentRenderer.tileSize * diffX)) * log2;
+        double zoomY = Math.log(viewHeight / (MapComponentRenderer.tileSize * diffY)) * log2;
+
+        float zoom = (float) Math.min(zoomX, zoomY);
+        if (zoom != zoom || zoom == Float.NEGATIVE_INFINITY || zoom == Float.POSITIVE_INFINITY) {
+            zoom = defaultZoom;
+        }
+
+        doSetPosition((x1 + x2) * 0.5, (y1 + y2) * 0.5, zoom);
     }
 
     public void queueEventOnDraw(Runnable runnable) {
@@ -171,17 +208,6 @@ public class MapComponent extends GLSurfaceView {
         });
     }
 
-    private void doCenterPosition() {
-        queueEvent(new Runnable() {
-            @Override
-            public void run() {
-                if (renderer.currentPosition != null) {
-                    renderer.setPosition(renderer.currentPosition.x, renderer.currentPosition.y, centeringZoom);
-                }
-            }
-        });
-    }
-
     private void doSetCurrentPosition(final CurrentPosition position) {
         queueEvent(new Runnable() {
             @Override
@@ -205,6 +231,15 @@ public class MapComponent extends GLSurfaceView {
             @Override
             public void run() {
                 renderer.setEndPosition(endPosition);
+            }
+        });
+    }
+
+    private void doSetPath(final double[] path) {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                renderer.setPath(path);
             }
         });
     }

@@ -26,7 +26,7 @@ public class GLUtils {
         return shaderId;
     }
 
-    public static int prepareBuffer(float[] data, int[] itmp1) {
+    public static int prepareStaticBuffer(float[] data, int[] itmp1) {
         glGenBuffers(1, itmp1, 0);
         int id = itmp1[0];
 
