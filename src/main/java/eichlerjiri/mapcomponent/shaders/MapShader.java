@@ -9,10 +9,11 @@ public class MapShader {
     private static final String vertexShaderSource = "" +
             "attribute vec2 vertex;\n" +
             "uniform mat4 pvm;\n" +
+            "uniform vec4 scaleShift;\n" +
             "varying vec2 texCoord;\n" +
             "\n" +
             "void main() {\n" +
-            "    texCoord = vertex;\n" +
+            "    texCoord = vec2(vertex.x * scaleShift.x + scaleShift.z, vertex.y * scaleShift.y + scaleShift.w);\n" +
             "    gl_Position = pvm * vec4(vertex,0,1);\n" +
             "}\n";
 
@@ -28,22 +29,26 @@ public class MapShader {
 
     private final int vertexLoc;
     private final int pvmLoc;
+    private final int scaleShiftLoc;
 
     public MapShader() {
         programId = GLUtils.createProgram(vertexShaderSource, fragmentShaderSource);
 
         vertexLoc = glGetAttribLocation(programId, "vertex");
         pvmLoc = glGetUniformLocation(programId, "pvm");
+        scaleShiftLoc = glGetUniformLocation(programId, "scaleShift");
     }
 
-    public void render(float[] pvm, int buffer, int bufferCount, int texture, int drawType) {
+    public void render(float[] pvm, int buffer, int bufferCount, int texture, int drawType,
+                       float scaleX, float scaleY, float shiftX, float shiftY) {
         glUseProgram(programId);
         glEnableVertexAttribArray(vertexLoc);
 
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
         glVertexAttribPointer(vertexLoc, 2, GL_FLOAT, false, 0, 0);
-
+ 
         glUniformMatrix4fv(pvmLoc, 1, false, pvm, 0);
+        glUniform4f(scaleShiftLoc, scaleX, scaleY, shiftX, shiftY);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);

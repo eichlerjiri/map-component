@@ -9,32 +9,32 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Random;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import eichlerjiri.mapcomponent.utils.IOUtils;
 import eichlerjiri.mapcomponent.utils.MapTileKey;
+import eichlerjiri.mapcomponent.utils.RequestedTile;
+import eichlerjiri.mapcomponent.utils.TileRunnable;
 
 public class TileLoader extends ThreadPoolExecutor {
 
     private final MapComponent mapComponent;
-    private final ArrayList<String> mapUrls;
-    private final ThreadLocal<String> serverUrl = new ThreadLocal<>();
     private final File cacheDir;
-    private final HashMap<MapTileKey, TileRunnable> requestedTiles = new HashMap<>();
+    private final HashMap<MapTileKey, RequestedTile> requestedTiles = new HashMap<>();
+    private final TileDownloader tileDownloader;
 
     public TileLoader(Context c, MapComponent mapComponent, ArrayList<String> mapUrls) {
-        super(10, 10, 0L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+        super(1, 1, 0L, TimeUnit.SECONDS, new PriorityBlockingQueue<Runnable>());
 
         this.mapComponent = mapComponent;
-        this.mapUrls = mapUrls;
         cacheDir = c.getCacheDir();
+        tileDownloader = new TileDownloader(this, mapUrls);
     }
 
-    public void requestTile(MapTileKey testTileKey, int tick) {
-        TileRunnable previousRunnable = requestedTiles.get(testTileKey);
+    public void requestTile(MapTileKey testTileKey, int tick, int priority) {
+        RequestedTile previousRunnable = requestedTiles.get(testTileKey);
         if (previousRunnable != null) {
             previousRunnable.tick = tick;
             previousRunnable.cancelled = false;
@@ -42,56 +42,91 @@ public class TileLoader extends ThreadPoolExecutor {
         }
 
         MapTileKey tileKey = new MapTileKey(testTileKey);
-        TileRunnable tileRunnable = new TileRunnable(tileKey, tick);
-        requestedTiles.put(tileKey, tileRunnable);
-        execute(tileRunnable);
+        RequestedTile requestedTile = new RequestedTile(tileKey, tick, priority);
+        requestedTiles.put(tileKey, requestedTile);
+        processTile(requestedTile);
+    }
+
+    private void processTile(final RequestedTile requestedTile) {
+        execute(new TileRunnable(requestedTile) {
+            @Override
+            public void run() {
+                if (priority != requestedTile.priority) {
+                    priority = requestedTile.priority;
+                    execute(this);
+                    return;
+                }
+
+                if (requestedTile.cancelled) {
+                    cancelTile(requestedTile);
+                } else {
+                    loadTile(requestedTile);
+                }
+            }
+        });
     }
 
     public void cancelUnused(int tick) {
-        for (TileRunnable runnable : requestedTiles.values()) {
-            if (runnable.tick != tick) {
-                runnable.cancelled = true;
+        for (RequestedTile requestedTile : requestedTiles.values()) {
+            if (requestedTile.tick != tick) {
+                requestedTile.cancelled = true;
             }
         }
     }
 
-    private void loadTile(MapTileKey tileKey) {
+    private void loadTile(RequestedTile requestedTile) {
+        MapTileKey tileKey = requestedTile.tileKey;
         File cacheFile = new File(cacheDir, "tiles/ " + tileKey.zoom + "/" + tileKey.x + "/" + tileKey.y + ".png");
-        boolean cacheFileExists = cacheFile.exists();
 
-        byte[] data = null;
-        if (cacheFileExists) {
-            data = IOUtils.readFile(cacheFile);
+        if (cacheFile.exists()) {
+            byte[] data = IOUtils.readFile(cacheFile);
+            processRawImage(requestedTile, data);
+        } else {
+            tileDownloader.scheduleDownloadTile(requestedTile);
         }
-        if (data == null) {
-            String serverUrlStr = serverUrl.get();
-            if (serverUrlStr == null) {
-                serverUrlStr = mapUrls.get(new Random().nextInt(mapUrls.size()));
-                serverUrl.set(serverUrlStr);
+    }
+
+    public void scheduleProcessDownloaded(final RequestedTile requestedTile, final byte[] data) {
+        execute(new TileRunnable(requestedTile) {
+            @Override
+            public void run() {
+                if (priority != requestedTile.priority) {
+                    priority = requestedTile.priority;
+                    execute(this);
+                    return;
+                }
+
+                if (processRawImage(requestedTile, data)) {
+                    saveToCache(requestedTile, data);
+                }
             }
+        });
+    }
 
-            String url = serverUrlStr + tileKey.zoom + "/" + tileKey.x + "/" + tileKey.y + ".png";
-            Log.i("TileLoader", "Downloading: " + url);
-            data = IOUtils.download(url);
-        }
+    private boolean processRawImage(RequestedTile requestedTile, byte[] data) {
+        MapTileKey tileKey = requestedTile.tileKey;
 
         if (data == null) {
             returnTile(tileKey, 0, 0, null);
-            return;
+            return false;
         }
 
         Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
         if (bitmap == null) {
             returnTile(tileKey, 0, 0, null);
-            return;
-        }
-
-        if (!cacheFileExists) {
-            cacheFile.getParentFile().mkdirs();
-            IOUtils.writeFile(cacheFile, data);
+            return false;
         }
 
         returnTile(tileKey, bitmap.getWidth(), bitmap.getHeight(), convertBitmap(bitmap));
+        return true;
+    }
+
+    private void saveToCache(RequestedTile requestedTile, byte[] data) {
+        MapTileKey tileKey = requestedTile.tileKey;
+        File cacheFile = new File(cacheDir, "tiles/ " + tileKey.zoom + "/" + tileKey.x + "/" + tileKey.y + ".png");
+
+        cacheFile.getParentFile().mkdirs();
+        IOUtils.writeFile(cacheFile, data);
     }
 
     private ByteBuffer convertBitmap(Bitmap b) {
@@ -113,45 +148,24 @@ public class TileLoader extends ThreadPoolExecutor {
         mapComponent.queueEventOnDraw(new Runnable() {
             @Override
             public void run() {
-                TileRunnable tileRunnable = requestedTiles.remove(tileKey);
-                if (!tileRunnable.cancelled) {
+                RequestedTile requestedTile = requestedTiles.remove(tileKey);
+                if (!requestedTile.cancelled) {
                     mapComponent.renderer.tileLoaded(tileKey, width, height, data);
                 }
             }
         });
     }
 
-    private void cancelTile(final TileRunnable tileRunnable) {
+    public void cancelTile(final RequestedTile requestedTile) {
         mapComponent.queueEvent(new Runnable() {
             @Override
             public void run() {
-                if (tileRunnable.cancelled) {
-                    requestedTiles.remove(tileRunnable.tileKey);
+                if (requestedTile.cancelled) {
+                    requestedTiles.remove(requestedTile.tileKey);
                 } else {
-                    execute(tileRunnable);
+                    processTile(requestedTile);
                 }
             }
         });
-    }
-
-    private class TileRunnable implements Runnable {
-
-        public final MapTileKey tileKey;
-        public volatile boolean cancelled;
-        public int tick;
-
-        public TileRunnable(MapTileKey tileKey, int tick) {
-            this.tileKey = tileKey;
-            this.tick = tick;
-        }
-
-        @Override
-        public void run() {
-            if (cancelled) {
-                cancelTile(this);
-            } else {
-                loadTile(tileKey);
-            }
-        }
     }
 }

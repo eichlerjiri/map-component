@@ -160,7 +160,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
         for (int i = centerTileX - searchDist; i <= centerTileX + searchDist; i++) {
             for (int j = centerTileY - searchDist; j <= centerTileY + searchDist; j++) {
-                drawTile(i, j);
+                drawTile(i, j, Math.abs(i - centerTileX) + Math.abs(j - centerTileY));
             }
         }
 
@@ -189,40 +189,96 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         removeUnused();
     }
 
-    private void drawTile(int tileX, int tileY) {
+    private void drawTile(int tileXview, int tileY, int toCenter) {
         if (tileY < 0 || tileY >= tiles) {
             return;
         }
 
-        int tileXreal = tileX;
-        while (tileXreal < 0) {
-            tileXreal += tiles;
+        int tileX = tileXview;
+        while (tileX < 0) {
+            tileX += tiles;
         }
-        while (tileXreal >= tiles) {
-            tileXreal -= tiles;
+        while (tileX >= tiles) {
+            tileX -= tiles;
         }
 
-        testKey.zoom = mapZoom;
-        testKey.x = tileXreal;
-        testKey.y = tileY;
-        TileCacheItem cacheItem = tileCache.get(testKey);
+        // regular tile, matching zoom
+        int texture = getTexture(mapZoom, tileX, tileY, toCenter);
+        if (texture != 0) {
+            float translateX = translateX(tileXview * tilesReversed);
+            float translateY = translateY(tileY * tilesReversed);
+            Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, translateX, translateY, 0);
+            Matrix.scaleM(tmpMatrix, 0, scale, scale, 1);
 
-        if (cacheItem == null) {
-            mapComponent.tileLoader.requestTile(testKey, tick);
+            mapShader.render(tmpMatrix, mapVbuffer, mapVbufferCount, texture, GL_TRIANGLE_FAN, 1, 1, 0, 0);
             return;
+        }
+
+        // lower zoom tile, going up to zoom 0
+        int testZoom = mapZoom - 1;
+        int testX = tileX / 2;
+        int testY = tileY / 2;
+        while (testZoom >= 0) {
+            texture = getTexture(testZoom, testX, testY, (mapZoom - testZoom) * 1000000 + toCenter);
+            if (texture != 0) {
+                float translateX = translateX(tileXview * tilesReversed);
+                float translateY = translateY(tileY * tilesReversed);
+                Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, translateX, translateY, 0);
+                Matrix.scaleM(tmpMatrix, 0, scale, scale, 1);
+
+                int zoomDiffTiles = 1 << (mapZoom - testZoom);
+                float scaleTile = 1.0f / zoomDiffTiles;
+                float shiftX = scaleTile * (tileX - testX * zoomDiffTiles);
+                float shiftY = scaleTile * (tileY - testY * zoomDiffTiles);
+
+                mapShader.render(tmpMatrix, mapVbuffer, mapVbufferCount, texture, GL_TRIANGLE_FAN,
+                        scaleTile, scaleTile, shiftX, shiftY);
+                return;
+            }
+
+            testZoom--;
+            testX /= 2;
+            testY /= 2;
+        }
+
+        // try one higher zoom, for zooming out
+        testZoom = mapZoom + 1;
+        testX = tileX * 2;
+        testY = tileY * 2;
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+                int curTileX = testX + i;
+                int curTileY = testY + j;
+
+                texture = getTexture(testZoom, curTileX, curTileY, 100000000 + toCenter);
+                if (texture != 0) {
+                    float translateX = translateX(curTileX * tilesReversed * 0.5f);
+                    float translateY = translateY(curTileY * tilesReversed * 0.5f);
+                    Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, translateX, translateY, 0);
+                    Matrix.scaleM(tmpMatrix, 0, scale * 0.5f, scale * 0.5f, 1);
+
+                    mapShader.render(tmpMatrix, mapVbuffer, mapVbufferCount, texture, GL_TRIANGLE_FAN, 1, 1, 0, 0);
+                }
+            }
+        }
+    }
+
+    private int getTexture(int zoom, int x, int y, int priority) {
+        if (zoom < 0 || zoom > 19) {
+            return 0;
+        }
+
+        testKey.zoom = zoom;
+        testKey.x = x;
+        testKey.y = y;
+        TileCacheItem cacheItem = tileCache.get(testKey);
+        if (cacheItem == null) {
+            mapComponent.tileLoader.requestTile(testKey, tick, priority);
+            return 0;
         }
 
         cacheItem.tick = tick;
-        if (cacheItem.textureID == 0) {
-            return;
-        }
-
-        float translateX = translateX(tileX * tilesReversed);
-        float translateY = translateY(tileY * tilesReversed);
-        Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, translateX, translateY, 0);
-        Matrix.scaleM(tmpMatrix, 0, scale, scale, 1);
-
-        mapShader.render(tmpMatrix, mapVbuffer, mapVbufferCount, cacheItem.textureID, GL_TRIANGLE_FAN);
+        return cacheItem.textureID;
     }
 
     private void drawCurrentPosition() {
@@ -267,38 +323,64 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     }
 
     private void drawPath() {
+        if (path.length < 4) {
+            return;
+        }
         if (colorShader == null) {
             colorShader = new ColorShader();
         }
 
+        float ptx = translateX(path[0]);
+        float pty = translateY(path[1]);
+
+        float ptx11 = Float.MIN_VALUE;
+        float pty11 = Float.MIN_VALUE;
+        float ptx12 = Float.MIN_VALUE;
+        float pty12 = Float.MIN_VALUE;
+        float ptx21 = Float.MIN_VALUE;
+        float pty21 = Float.MIN_VALUE;
+        float ptx22 = Float.MIN_VALUE;
+        float pty22 = Float.MIN_VALUE;
+
         for (int i = 2; i < path.length; i += 2) {
-            float tx1 = translateX(path[i - 2]);
-            float ty1 = translateY(path[i - 1]);
-            float tx2 = translateX(path[i]);
-            float ty2 = translateY(path[i + 1]);
+            float tx = translateX(path[i]);
+            float ty = translateY(path[i + 1]);
 
-            float vx = tx2 - tx1;
-            float vy = ty2 - ty1;
+            float vx = tx - ptx;
+            float vy = ty - pty;
 
-            float norm = 1 / (float) Math.sqrt(vx * vx + vy * vy);
+            float norm = 3 / (float) Math.sqrt(vx * vx + vy * vy);
             vx *= norm;
             vy *= norm;
 
-            float tx11 = tx1 + vy * 3;
-            float ty11 = ty1 - vx * 3;
-            float tx12 = tx1 - vy * 3;
-            float ty12 = ty1 + vx * 3;
-            float tx21 = tx2 + vy * 3;
-            float ty21 = ty2 - vx * 3;
-            float tx22 = tx2 - vy * 3;
-            float ty22 = ty2 + vx * 3;
+            float tx11 = ptx + vy;
+            float ty11 = pty - vx;
+            float tx12 = ptx - vy;
+            float ty12 = pty + vx;
+            float tx21 = tx + vy;
+            float ty21 = ty - vx;
+            float tx22 = tx - vy;
+            float ty22 = ty + vx;
 
-            fltmp1.add(tx11, ty11, tx12, ty12, tx21, ty21, tx12, ty12, tx21, ty21, tx22, ty22);
+            if (ptx11 != Float.MIN_VALUE) {
+                fltmp1.add(ptx11, pty11, ptx12, pty12, ptx21, pty21, ptx12, pty12, ptx21, pty21, ptx22, pty22);
+                fltmp1.add(ptx21, pty21, tx11, ty11, ptx, pty, ptx22, pty22, tx12, ty12, ptx, pty);
+            }
+
+            ptx = tx;
+            pty = ty;
+
+            ptx11 = tx11;
+            pty11 = ty11;
+            ptx12 = tx12;
+            pty12 = ty12;
+            ptx21 = tx21;
+            pty21 = ty21;
+            ptx22 = tx22;
+            pty22 = ty22;
         }
 
-        if (fltmp1.size == 0) {
-            return;
-        }
+        fltmp1.add(ptx11, pty11, ptx12, pty12, ptx21, pty21, ptx12, pty12, ptx21, pty21, ptx22, pty22);
 
         glBindBuffer(GL_ARRAY_BUFFER, pathVbuffer);
         glBufferData(GL_ARRAY_BUFFER, fltmp1.size * 4, FloatBuffer.wrap(fltmp1.data, 0, fltmp1.size), GL_DYNAMIC_DRAW);
@@ -369,8 +451,8 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     private void setZoom(float newZoom) {
         if (newZoom < 0) {
             newZoom = 0;
-        } else if (newZoom > 19) {
-            newZoom = 19;
+        } else if (newZoom > 20) {
+            newZoom = 20;
         }
 
         zoom = newZoom;
