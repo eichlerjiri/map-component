@@ -46,7 +46,7 @@ public class MapShader {
 
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
         glVertexAttribPointer(vertexLoc, 2, GL_FLOAT, false, 0, 0);
- 
+
         glUniformMatrix4fv(pvmLoc, 1, false, pvm, 0);
         glUniform4f(scaleShiftLoc, scaleX, scaleY, shiftX, shiftY);
 

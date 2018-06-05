@@ -3,6 +3,7 @@ package eichlerjiri.mapcomponent;
 import android.content.Context;
 import android.location.Location;
 import android.opengl.GLSurfaceView;
+import android.view.GestureDetector;
 import android.view.MotionEvent;
 
 import java.util.ArrayList;
@@ -21,6 +22,7 @@ public class MapComponent extends GLSurfaceView {
     public final TileLoader tileLoader;
 
     public final ConcurrentLinkedQueue<Runnable> onDrawRunnables = new ConcurrentLinkedQueue<>();
+    private final GestureDetector gestureDetector;
 
     private float lastX1 = Float.MIN_VALUE;
     private float lastY1 = Float.MIN_VALUE;
@@ -38,6 +40,14 @@ public class MapComponent extends GLSurfaceView {
         setEGLContextClientVersion(2);
         setRenderer(renderer);
         setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+
+        gestureDetector = new GestureDetector(new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                doZoomIn(e.getX(), e.getY());
+                return true;
+            }
+        });
     }
 
     public void setCurrentPosition(Location location) {
@@ -120,6 +130,7 @@ public class MapComponent extends GLSurfaceView {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        gestureDetector.onTouchEvent(event);
         int action = event.getActionMasked();
 
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
@@ -195,6 +206,15 @@ public class MapComponent extends GLSurfaceView {
             @Override
             public void run() {
                 renderer.moveDouble(preX1, preY1, preX2, preY2, postX1, postY1, postX2, postY2);
+            }
+        });
+    }
+
+    private void doZoomIn(final float x, final float y) {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                renderer.zoomIn(x, y);
             }
         });
     }
