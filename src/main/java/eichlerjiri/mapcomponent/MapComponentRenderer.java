@@ -13,6 +13,7 @@ import javax.microedition.khronos.opengles.GL10;
 
 import eichlerjiri.mapcomponent.shaders.ColorShader;
 import eichlerjiri.mapcomponent.shaders.MapShader;
+import eichlerjiri.mapcomponent.utils.AndroidUtils;
 import eichlerjiri.mapcomponent.utils.CurrentPosition;
 import eichlerjiri.mapcomponent.utils.FloatArrayList;
 import eichlerjiri.mapcomponent.utils.GLUtils;
@@ -23,10 +24,9 @@ import static android.opengl.GLES20.*;
 
 public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
-    public static final float tileSize = 256.0f;
-
     private final MapComponent mapComponent;
-    private final float scaledDensity;
+    private final float spSize;
+    public final float tileSize;
 
     private double posX = 0.5;
     private double posY = 0.5;
@@ -47,6 +47,8 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     private int mapVbufferCount;
     private int currentPositionVbuffer;
     private int currentPositionVbufferCount;
+    private int nodirCurrentPositionVbuffer;
+    private int nodirCurrentPositionVbufferCount;
     private int positionVbuffer;
     private int positionVbufferCount;
     private int pathVbuffer;
@@ -83,37 +85,39 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
     public MapComponentRenderer(MapComponent mapComponent) {
         this.mapComponent = mapComponent;
-        scaledDensity = mapComponent.getContext().getResources().getDisplayMetrics().scaledDensity;
+        spSize = AndroidUtils.spSize(mapComponent.getContext());
+        tileSize = 256 * spSize;
 
         refreshScreenSizeValues();
         refreshZoomValues();
         refreshAzimuthValues();
     }
 
-    public void setPosition(double x, double y, float newZoom) {
+    public void setPosition(double x, double y, float newZoom, float azimuth) {
         setZoom(newZoom);
         setPos(x, y);
-        mapComponent.requestRender();
+        setAzimuth(azimuth);
+        mapComponent.glView.requestRender();
     }
 
     public void setCurrentPosition(CurrentPosition currentPosition) {
         this.currentPosition = currentPosition;
-        mapComponent.requestRender();
+        mapComponent.glView.requestRender();
     }
 
     public void setStartPosition(Position startPosition) {
         this.startPosition = startPosition;
-        mapComponent.requestRender();
+        mapComponent.glView.requestRender();
     }
 
     public void setEndPosition(Position endPosition) {
         this.endPosition = endPosition;
-        mapComponent.requestRender();
+        mapComponent.glView.requestRender();
     }
 
     public void setPath(double[] path) {
         this.path = path;
-        mapComponent.requestRender();
+        mapComponent.glView.requestRender();
     }
 
     @Override
@@ -130,6 +134,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
         colorShader = null;
         currentPositionVbuffer = 0;
+        nodirCurrentPositionVbuffer = 0;
         positionVbuffer = 0;
         pathVbuffer = 0;
     }
@@ -293,20 +298,42 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         if (colorShader == null) {
             colorShader = new ColorShader();
         }
-        if (currentPositionVbuffer == 0) {
-            float[] data = new float[]{-10, 10, 0, -3, 0, -10, 10, 10, 0, -3, 0, -10};
-            for (int i = 0; i < data.length; i++) {
-                data[i] *= scaledDensity;
-            }
-            currentPositionVbuffer = GLUtils.prepareStaticBuffer(data, itmp1);
-            currentPositionVbufferCount = data.length / 2;
-        }
 
         preparePoint(currentPosition.x, currentPosition.y);
         Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, ftmp1, ftmp2, 0);
-        Matrix.rotateM(tmpMatrix, 0, azimuth + currentPosition.azimuth, 0, 0, 1);
 
-        colorShader.render(tmpMatrix, currentPositionVbuffer, currentPositionVbufferCount, GL_TRIANGLES, 0, 0, 1, 1);
+        if (currentPosition.azimuth != Float.MIN_VALUE) {
+            if (currentPositionVbuffer == 0) {
+                float[] data = new float[]{-12, 12, 0, -4, 0, -12, 12, 12, 0, -4, 0, -12};
+                for (int i = 0; i < data.length; i++) {
+                    data[i] *= spSize;
+                }
+                currentPositionVbuffer = GLUtils.prepareStaticBuffer(data, itmp1);
+                currentPositionVbufferCount = data.length / 2;
+            }
+
+            Matrix.rotateM(tmpMatrix, 0, azimuth + currentPosition.azimuth, 0, 0, 1);
+
+            colorShader.render(tmpMatrix, currentPositionVbuffer, currentPositionVbufferCount, GL_TRIANGLES,
+                    0, 0, 1, 1);
+        } else {
+            if (nodirCurrentPositionVbuffer == 0) {
+                float[] data = new float[]{
+                        -12, 0, -8, 0, 0, 12, 0, 12, 0, 8, -8, 0,
+                        12, 0, 8, 0, 0, -12, 0, -12, 0, -8, 8, 0,
+                        -12, 0, -8, 0, 0, -12, 0, -12, 0, -8, -8, 0,
+                        12, 0, 8, 0, 0, 12, 0, 12, 0, 8, 8, 0
+                };
+                for (int i = 0; i < data.length; i++) {
+                    data[i] *= spSize;
+                }
+                nodirCurrentPositionVbuffer = GLUtils.prepareStaticBuffer(data, itmp1);
+                nodirCurrentPositionVbufferCount = data.length / 2;
+            }
+
+            colorShader.render(tmpMatrix, nodirCurrentPositionVbuffer, nodirCurrentPositionVbufferCount, GL_TRIANGLES,
+                    0, 0, 1, 1);
+        }
     }
 
     private void drawPosition(Position position, float r, float g, float b, float a) {
@@ -316,7 +343,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         if (positionVbuffer == 0) {
             float[] data = new float[]{0, 0, 10, -20, -10, -20};
             for (int i = 0; i < data.length; i++) {
-                data[i] *= scaledDensity;
+                data[i] *= spSize;
             }
             positionVbuffer = GLUtils.prepareStaticBuffer(data, itmp1);
             positionVbufferCount = data.length / 2;
@@ -357,7 +384,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             float vx = tx - ptx;
             float vy = ty - pty;
 
-            float norm = 3 / (float) Math.sqrt(vx * vx + vy * vy);
+            float norm = 1.5f * spSize / (float) Math.sqrt(vx * vx + vy * vy);
             vx *= norm;
             vy *= norm;
 
@@ -412,7 +439,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         double y = (preY - postY) * mercatorPixelSize;
         setPos(posX + x * azimuthCos + y * azimuthSin, posY + y * azimuthCos - x * azimuthSin);
 
-        mapComponent.requestRender();
+        mapComponent.glView.requestRender();
     }
 
     public void moveDouble(float preX1, float preY1, float preX2, float preY2,
@@ -448,7 +475,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         double posY2 = posY1 - (postY1 * azimuthCos - postX1 * azimuthSin) * mercatorPixelSize;
         setPos(posX2, posY2);
 
-        mapComponent.requestRender();
+        mapComponent.glView.requestRender();
     }
 
     public void zoomIn(float x, float y) {
@@ -463,7 +490,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         double py = posY + (y * azimuthCos - x * azimuthSin) * (preMercatorPixelSize - mercatorPixelSize);
         setPos(px, py);
 
-        mapComponent.requestRender();
+        mapComponent.glView.requestRender();
     }
 
     private void setPos(double x, double y) {
@@ -534,7 +561,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         glBindTexture(GL_TEXTURE_2D, 0);
 
         tileCache.put(key, new TileCacheItem(textureId, tick));
-        mapComponent.requestRender();
+        mapComponent.glView.requestRender();
     }
 
     private void removeUnused() {

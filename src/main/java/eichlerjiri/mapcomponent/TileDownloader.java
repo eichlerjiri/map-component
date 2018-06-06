@@ -15,15 +15,16 @@ import eichlerjiri.mapcomponent.utils.TileRunnable;
 
 public class TileDownloader extends ThreadPoolExecutor {
 
-    private final TileLoader tileLoader;
+    private final MapComponent mapComponent;
     private final ArrayList<String> mapUrls;
     private final ThreadLocal<String> serverUrl = new ThreadLocal<>();
 
-    public TileDownloader(TileLoader tileLoader, ArrayList<String> mapUrls) {
-        super(10, 10, 10L, TimeUnit.SECONDS, new PriorityBlockingQueue<Runnable>());
+    public TileDownloader(MapComponent mapComponent, ArrayList<String> mapUrls) {
+        super(10, 10, 10L, TimeUnit.SECONDS, new PriorityBlockingQueue<Runnable>(),
+                new ThreadPoolExecutor.DiscardPolicy());
         allowCoreThreadTimeOut(true);
 
-        this.tileLoader = tileLoader;
+        this.mapComponent = mapComponent;
         this.mapUrls = mapUrls;
     }
 
@@ -38,7 +39,7 @@ public class TileDownloader extends ThreadPoolExecutor {
                 }
 
                 if (requestedTile.cancelled) {
-                    tileLoader.cancelTile(requestedTile);
+                    mapComponent.tileLoader.cancelTile(requestedTile);
                 } else {
                     downloadTile(requestedTile);
                 }
@@ -59,6 +60,6 @@ public class TileDownloader extends ThreadPoolExecutor {
         Log.i("TileDownloader", "Downloading: " + url);
         byte[] data = IOUtils.download(url);
 
-        tileLoader.scheduleProcessDownloaded(tile, data);
+        mapComponent.tileLoader.scheduleProcessDownloaded(tile, data);
     }
 }

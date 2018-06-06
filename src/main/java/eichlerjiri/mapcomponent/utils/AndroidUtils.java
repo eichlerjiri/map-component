@@ -4,7 +4,7 @@ import android.content.Context;
 
 public class AndroidUtils {
 
-    public static float spToPix(Context context, float sp) {
-        return sp * context.getResources().getDisplayMetrics().scaledDensity;
+    public static float spSize(Context context) {
+        return context.getResources().getDisplayMetrics().scaledDensity;
     }
 }

@@ -7,7 +7,6 @@ import android.util.Log;
 
 import java.io.File;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -23,14 +22,13 @@ public class TileLoader extends ThreadPoolExecutor {
     private final MapComponent mapComponent;
     private final File cacheDir;
     private final HashMap<MapTileKey, RequestedTile> requestedTiles = new HashMap<>();
-    private final TileDownloader tileDownloader;
 
-    public TileLoader(Context c, MapComponent mapComponent, ArrayList<String> mapUrls) {
-        super(1, 1, 0L, TimeUnit.SECONDS, new PriorityBlockingQueue<Runnable>());
+    public TileLoader(Context c, MapComponent mapComponent) {
+        super(1, 1, 0L, TimeUnit.SECONDS, new PriorityBlockingQueue<Runnable>(),
+                new ThreadPoolExecutor.DiscardPolicy());
 
         this.mapComponent = mapComponent;
         cacheDir = c.getCacheDir();
-        tileDownloader = new TileDownloader(this, mapUrls);
     }
 
     public void requestTile(MapTileKey testTileKey, int tick, int priority) {
@@ -82,7 +80,7 @@ public class TileLoader extends ThreadPoolExecutor {
             byte[] data = IOUtils.readFile(cacheFile);
             processRawImage(requestedTile, data);
         } else {
-            tileDownloader.scheduleDownloadTile(requestedTile);
+            mapComponent.tileDownloader.scheduleDownloadTile(requestedTile);
         }
     }
 
@@ -157,7 +155,7 @@ public class TileLoader extends ThreadPoolExecutor {
     }
 
     public void cancelTile(final RequestedTile requestedTile) {
-        mapComponent.queueEvent(new Runnable() {
+        mapComponent.glView.queueEvent(new Runnable() {
             @Override
             public void run() {
                 if (requestedTile.cancelled) {

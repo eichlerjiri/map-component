@@ -5,6 +5,10 @@ import android.location.Location;
 import android.opengl.GLSurfaceView;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -16,30 +20,53 @@ import eichlerjiri.mapcomponent.utils.GeoBoundary;
 import eichlerjiri.mapcomponent.utils.MercatorUtils;
 import eichlerjiri.mapcomponent.utils.Position;
 
-public class MapComponent extends GLSurfaceView {
+public abstract class MapComponent extends RelativeLayout {
 
+    public final GLSurfaceView glView;
     public final MapComponentRenderer renderer = new MapComponentRenderer(this);
     public final TileLoader tileLoader;
+    public final TileDownloader tileDownloader;
 
     public final ConcurrentLinkedQueue<Runnable> onDrawRunnables = new ConcurrentLinkedQueue<>();
     private final GestureDetector gestureDetector;
+
+    private final LinearLayout centerButtonLayout;
 
     private float lastX1 = Float.MIN_VALUE;
     private float lastY1 = Float.MIN_VALUE;
     private float lastX2 = Float.MIN_VALUE;
     private float lastY2 = Float.MIN_VALUE;
 
-    public boolean centered;
+    public boolean centered = true;
 
     public MapComponent(Context context, ArrayList<String> mapUrls) {
         super(context);
-        tileLoader = new TileLoader(context, this, mapUrls);
+        glView = new GLSurfaceView(context);
+        tileLoader = new TileLoader(context, this);
+        tileDownloader = new TileDownloader(this, mapUrls);
 
-        setZOrderOnTop(true); // no black flash on load
+        glView.setZOrderOnTop(true); // no black flash on load
+        glView.setZOrderMediaOverlay(true);
 
-        setEGLContextClientVersion(2);
-        setRenderer(renderer);
-        setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+        centerButtonLayout = new LinearLayout(context);
+        Button centerButton = new Button(context);
+        centerButton.setBackgroundResource(R.mipmap.center);
+        centerButtonLayout.addView(centerButton);
+        centerButtonLayout.setBackgroundColor(0x99ffffff);
+
+        float spSize = AndroidUtils.spSize(context);
+        int size = Math.round(40 * spSize);
+        int margin = Math.round(10 * spSize);
+
+        LayoutParams params = new LayoutParams(size, size);
+        params.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+        params.setMargins(margin, margin, margin, margin);
+        centerButtonLayout.setLayoutParams(params);
+
+        glView.setEGLContextClientVersion(2);
+        glView.setRenderer(renderer);
+        glView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+        addView(glView);
 
         gestureDetector = new GestureDetector(new GestureDetector.SimpleOnGestureListener() {
             @Override
@@ -48,13 +75,38 @@ public class MapComponent extends GLSurfaceView {
                 return true;
             }
         });
+
+        centerButton.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startCentering();
+            }
+        });
+    }
+
+    public abstract void centerMap();
+
+    public void stopCentering() {
+        if (centered) {
+            addView(centerButtonLayout);
+            centered = false;
+        }
+    }
+
+    public void startCentering() {
+        if (!centered) {
+            removeView(centerButtonLayout);
+            centered = true;
+            centerMap();
+        }
     }
 
     public void setCurrentPosition(Location location) {
         if (location != null) {
             double x = MercatorUtils.lonToMercatorX(location.getLongitude());
             double y = MercatorUtils.latToMercatorY(location.getLatitude());
-            doSetCurrentPosition(new CurrentPosition(x, y, location.getBearing()));
+            float bearing = location.hasBearing() ? location.getBearing() : Float.MIN_VALUE;
+            doSetCurrentPosition(new CurrentPosition(x, y, bearing));
         } else {
             doSetCurrentPosition(null);
         }
@@ -89,8 +141,8 @@ public class MapComponent extends GLSurfaceView {
         }
     }
 
-    public void moveTo(double lat, double lon, float zoom) {
-        doSetPosition(MercatorUtils.lonToMercatorX(lon), MercatorUtils.latToMercatorY(lat), zoom);
+    public void moveTo(double lat, double lon, float zoom, float azimuth) {
+        doSetPosition(MercatorUtils.lonToMercatorX(lon), MercatorUtils.latToMercatorY(lat), zoom, azimuth);
     }
 
     public void moveToBoundary(GeoBoundary geoBoundary, float viewWidth, float viewHeight,
@@ -103,7 +155,7 @@ public class MapComponent extends GLSurfaceView {
         double diffX = x2 - x1;
         double diffY = y1 - y2;
 
-        float pixPadding = AndroidUtils.spToPix(getContext(), padding * 2);
+        float pixPadding = padding * 2 * AndroidUtils.spSize(getContext());
         if (viewWidth - pixPadding > 0) {
             viewWidth -= pixPadding;
         }
@@ -112,20 +164,20 @@ public class MapComponent extends GLSurfaceView {
         }
 
         double log2 = 1 / Math.log(2);
-        double zoomX = Math.log(viewWidth / (MapComponentRenderer.tileSize * diffX)) * log2;
-        double zoomY = Math.log(viewHeight / (MapComponentRenderer.tileSize * diffY)) * log2;
+        double zoomX = Math.log(viewWidth / (renderer.tileSize * diffX)) * log2;
+        double zoomY = Math.log(viewHeight / (renderer.tileSize * diffY)) * log2;
 
         float zoom = (float) Math.min(zoomX, zoomY);
         if (zoom != zoom || zoom == Float.NEGATIVE_INFINITY || zoom == Float.POSITIVE_INFINITY) {
             zoom = defaultZoom;
         }
 
-        doSetPosition((x1 + x2) * 0.5, (y1 + y2) * 0.5, zoom);
+        doSetPosition((x1 + x2) * 0.5, (y1 + y2) * 0.5, zoom, 0);
     }
 
     public void queueEventOnDraw(Runnable runnable) {
         onDrawRunnables.add(runnable);
-        requestRender();
+        glView.requestRender();
     }
 
     @Override
@@ -170,7 +222,7 @@ public class MapComponent extends GLSurfaceView {
 
                 if (id == 0) {
                     if (lastX2 == Float.MIN_VALUE) {
-                        centered = false;
+                        stopCentering();
                         doMoveSingle(lastX1, lastY1, x, y);
                     }
 
@@ -183,7 +235,7 @@ public class MapComponent extends GLSurfaceView {
             }
 
             if (lastX1 != Float.MIN_VALUE && lastX2 != Float.MIN_VALUE) {
-                centered = false;
+                stopCentering();
                 doMoveDouble(preX1, preY1, preX2, preY2, lastX1, lastY1, lastX2, lastY2);
             }
         }
@@ -192,7 +244,7 @@ public class MapComponent extends GLSurfaceView {
     }
 
     private void doMoveSingle(final float preX, final float preY, final float postX, final float postY) {
-        queueEvent(new Runnable() {
+        glView.queueEvent(new Runnable() {
             @Override
             public void run() {
                 renderer.moveSingle(preX, preY, postX, postY);
@@ -202,7 +254,7 @@ public class MapComponent extends GLSurfaceView {
 
     private void doMoveDouble(final float preX1, final float preY1, final float preX2, final float preY2,
                               final float postX1, final float postY1, final float postX2, final float postY2) {
-        queueEvent(new Runnable() {
+        glView.queueEvent(new Runnable() {
             @Override
             public void run() {
                 renderer.moveDouble(preX1, preY1, preX2, preY2, postX1, postY1, postX2, postY2);
@@ -211,7 +263,7 @@ public class MapComponent extends GLSurfaceView {
     }
 
     private void doZoomIn(final float x, final float y) {
-        queueEvent(new Runnable() {
+        glView.queueEvent(new Runnable() {
             @Override
             public void run() {
                 renderer.zoomIn(x, y);
@@ -219,17 +271,17 @@ public class MapComponent extends GLSurfaceView {
         });
     }
 
-    private void doSetPosition(final double x, final double y, final float zoom) {
-        queueEvent(new Runnable() {
+    private void doSetPosition(final double x, final double y, final float zoom, final float azimuth) {
+        glView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                renderer.setPosition(x, y, zoom);
+                renderer.setPosition(x, y, zoom, azimuth);
             }
         });
     }
 
     private void doSetCurrentPosition(final CurrentPosition position) {
-        queueEvent(new Runnable() {
+        glView.queueEvent(new Runnable() {
             @Override
             public void run() {
                 renderer.setCurrentPosition(position);
@@ -238,7 +290,7 @@ public class MapComponent extends GLSurfaceView {
     }
 
     private void doSetStartPosition(final Position startPosition) {
-        queueEvent(new Runnable() {
+        glView.queueEvent(new Runnable() {
             @Override
             public void run() {
                 renderer.setStartPosition(startPosition);
@@ -247,7 +299,7 @@ public class MapComponent extends GLSurfaceView {
     }
 
     private void doSetEndPosition(final Position endPosition) {
-        queueEvent(new Runnable() {
+        glView.queueEvent(new Runnable() {
             @Override
             public void run() {
                 renderer.setEndPosition(endPosition);
@@ -256,7 +308,7 @@ public class MapComponent extends GLSurfaceView {
     }
 
     private void doSetPath(final double[] path) {
-        queueEvent(new Runnable() {
+        glView.queueEvent(new Runnable() {
             @Override
             public void run() {
                 renderer.setPath(path);
@@ -266,5 +318,6 @@ public class MapComponent extends GLSurfaceView {
 
     public void close() {
         tileLoader.shutdownNow();
+        tileDownloader.shutdownNow();
     }
 }
