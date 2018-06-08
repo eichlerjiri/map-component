@@ -14,7 +14,7 @@ public class ColorShader {
             "    gl_Position = pvm * vec4(vertex,0,1);\n" +
             "}\n";
 
-    private static final String fragmentShaderSource = "" +
+    private static final String fragmentShaderSource = "precision mediump float;" +
             "uniform vec4 color;\n" +
             "\n" +
             "void main() {\n" +

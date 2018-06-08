@@ -17,7 +17,7 @@ public class MapShader {
             "    gl_Position = pvm * vec4(vertex,0,1);\n" +
             "}\n";
 
-    private static final String fragmentShaderSource = "" +
+    private static final String fragmentShaderSource = "precision mediump float;" +
             "varying vec2 texCoord;\n" +
             "uniform sampler2D texture;\n" +
             "\n" +
