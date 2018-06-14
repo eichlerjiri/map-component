@@ -3,6 +3,7 @@ package eichlerjiri.mapcomponent;
 import android.content.Context;
 import android.location.Location;
 import android.opengl.GLSurfaceView;
+import android.os.Bundle;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -82,6 +83,29 @@ public abstract class MapComponent extends RelativeLayout {
                 startCentering();
             }
         });
+    }
+
+    public Bundle saveInstanceState() {
+        Bundle ret = new Bundle();
+
+        ret.putDouble("posX", renderer.posX);
+        ret.putDouble("posY", renderer.posY);
+        ret.putFloat("zoom", renderer.zoom);
+        ret.putFloat("azimuth", renderer.azimuth);
+        ret.putBoolean("centered", centered);
+
+        return ret;
+    }
+
+    public void restoreInstanceState(final Bundle bundle) {
+        doSetPosition(bundle.getDouble("posX"), bundle.getDouble("posY"), bundle.getFloat("zoom"),
+                bundle.getFloat("azimuth"));
+
+        if (bundle.getBoolean("centered")) {
+            startCentering();
+        } else {
+            stopCentering();
+        }
     }
 
     public abstract void centerMap();

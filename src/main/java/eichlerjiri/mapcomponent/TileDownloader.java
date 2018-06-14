@@ -2,6 +2,7 @@ package eichlerjiri.mapcomponent;
 
 import android.util.Log;
 
+import java.io.InterruptedIOException;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -32,22 +33,26 @@ public class TileDownloader extends ThreadPoolExecutor {
         execute(new TileRunnable(requestedTile) {
             @Override
             public void run() {
-                if (priority != requestedTile.priority) {
-                    priority = requestedTile.priority;
-                    execute(this);
-                    return;
-                }
+                try {
+                    if (priority != requestedTile.priority) {
+                        priority = requestedTile.priority;
+                        execute(this);
+                        return;
+                    }
 
-                if (requestedTile.cancelled) {
-                    mapComponent.tileLoader.cancelTile(requestedTile);
-                } else {
-                    downloadTile(requestedTile);
+                    if (requestedTile.cancelled) {
+                        mapComponent.tileLoader.cancelTile(requestedTile);
+                    } else {
+                        downloadTile(requestedTile);
+                    }
+                } catch (InterruptedIOException ignored) {
+                    // end
                 }
             }
         });
     }
 
-    private void downloadTile(RequestedTile tile) {
+    private void downloadTile(RequestedTile tile) throws InterruptedIOException {
         MapTileKey tileKey = tile.tileKey;
 
         String serverUrlStr = serverUrl.get();

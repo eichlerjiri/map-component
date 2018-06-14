@@ -28,10 +28,10 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     private final float spSize;
     public final float tileSize;
 
-    private double posX = 0.5;
-    private double posY = 0.5;
-    private float zoom;
-    private float azimuth;
+    public double posX = 0.5;
+    public double posY = 0.5;
+    public float zoom;
+    public float azimuth;
 
     public CurrentPosition currentPosition;
     public Position startPosition;
@@ -583,7 +583,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         surfaceCenterY = h * 0.5f;
 
         int tilesNecessaryBase = (int) (Math.sqrt(w * w + h * h) / tileSize);
-        searchDist = (tilesNecessaryBase + 1) / 2;
+        searchDist = 1 + tilesNecessaryBase / 2;
 
         if (w != 0 & h != 0) {
             Matrix.orthoM(mapMatrix, 0, 0, w, h, 0, -10, 10);

@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory;
 import android.util.Log;
 
 import java.io.File;
+import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -49,16 +50,21 @@ public class TileLoader extends ThreadPoolExecutor {
         execute(new TileRunnable(requestedTile) {
             @Override
             public void run() {
-                if (priority != requestedTile.priority) {
-                    priority = requestedTile.priority;
-                    execute(this);
-                    return;
-                }
+                try {
+                    if (priority != requestedTile.priority) {
+                        priority = requestedTile.priority;
+                        execute(this);
+                        return;
+                    }
 
-                if (requestedTile.cancelled) {
-                    cancelTile(requestedTile);
-                } else {
-                    loadTile(requestedTile);
+                    if (requestedTile.cancelled) {
+                        cancelTile(requestedTile);
+                    } else {
+                        loadTile(requestedTile);
+
+                    }
+                } catch (InterruptedIOException ignored) {
+                    // end
                 }
             }
         });
@@ -72,7 +78,7 @@ public class TileLoader extends ThreadPoolExecutor {
         }
     }
 
-    private void loadTile(RequestedTile requestedTile) {
+    private void loadTile(RequestedTile requestedTile) throws InterruptedIOException {
         MapTileKey tileKey = requestedTile.tileKey;
         File cacheFile = new File(cacheDir, "tiles/ " + tileKey.zoom + "/" + tileKey.x + "/" + tileKey.y + ".png");
 
@@ -88,14 +94,18 @@ public class TileLoader extends ThreadPoolExecutor {
         execute(new TileRunnable(requestedTile) {
             @Override
             public void run() {
-                if (priority != requestedTile.priority) {
-                    priority = requestedTile.priority;
-                    execute(this);
-                    return;
-                }
+                try {
+                    if (priority != requestedTile.priority) {
+                        priority = requestedTile.priority;
+                        execute(this);
+                        return;
+                    }
 
-                if (processRawImage(requestedTile, data)) {
-                    saveToCache(requestedTile, data);
+                    if (processRawImage(requestedTile, data)) {
+                        saveToCache(requestedTile, data);
+                    }
+                } catch (InterruptedIOException ignored) {
+                    // end
                 }
             }
         });
@@ -119,7 +129,7 @@ public class TileLoader extends ThreadPoolExecutor {
         return true;
     }
 
-    private void saveToCache(RequestedTile requestedTile, byte[] data) {
+    private void saveToCache(RequestedTile requestedTile, byte[] data) throws InterruptedIOException {
         MapTileKey tileKey = requestedTile.tileKey;
         File cacheFile = new File(cacheDir, "tiles/ " + tileKey.zoom + "/" + tileKey.x + "/" + tileKey.y + ".png");
 
