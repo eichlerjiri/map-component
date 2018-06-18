@@ -268,7 +268,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doMoveSingle(final float preX, final float preY, final float postX, final float postY) {
-        glView.queueEvent(new Runnable() {
+        queueEventOnDraw(new Runnable() {
             @Override
             public void run() {
                 renderer.moveSingle(preX, preY, postX, postY);
@@ -278,7 +278,7 @@ public abstract class MapComponent extends RelativeLayout {
 
     private void doMoveDouble(final float preX1, final float preY1, final float preX2, final float preY2,
                               final float postX1, final float postY1, final float postX2, final float postY2) {
-        glView.queueEvent(new Runnable() {
+        queueEventOnDraw(new Runnable() {
             @Override
             public void run() {
                 renderer.moveDouble(preX1, preY1, preX2, preY2, postX1, postY1, postX2, postY2);
@@ -287,7 +287,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doZoomIn(final float x, final float y) {
-        glView.queueEvent(new Runnable() {
+        queueEventOnDraw(new Runnable() {
             @Override
             public void run() {
                 renderer.zoomIn(x, y);
@@ -296,7 +296,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doSetPosition(final double x, final double y, final float zoom, final float azimuth) {
-        glView.queueEvent(new Runnable() {
+        queueEventOnDraw(new Runnable() {
             @Override
             public void run() {
                 renderer.setPosition(x, y, zoom, azimuth);
@@ -305,7 +305,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doSetCurrentPosition(final CurrentPosition position) {
-        glView.queueEvent(new Runnable() {
+        queueEventOnDraw(new Runnable() {
             @Override
             public void run() {
                 renderer.setCurrentPosition(position);
@@ -314,7 +314,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doSetStartPosition(final Position startPosition) {
-        glView.queueEvent(new Runnable() {
+        queueEventOnDraw(new Runnable() {
             @Override
             public void run() {
                 renderer.setStartPosition(startPosition);
@@ -323,7 +323,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doSetEndPosition(final Position endPosition) {
-        glView.queueEvent(new Runnable() {
+        queueEventOnDraw(new Runnable() {
             @Override
             public void run() {
                 renderer.setEndPosition(endPosition);
@@ -332,7 +332,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doSetPath(final double[] path) {
-        glView.queueEvent(new Runnable() {
+        queueEventOnDraw(new Runnable() {
             @Override
             public void run() {
                 renderer.setPath(path);

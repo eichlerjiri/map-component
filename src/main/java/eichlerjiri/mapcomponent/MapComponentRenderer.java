@@ -97,27 +97,22 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         setZoom(newZoom);
         setPos(x, y);
         setAzimuth(azimuth);
-        mapComponent.glView.requestRender();
     }
 
     public void setCurrentPosition(CurrentPosition currentPosition) {
         this.currentPosition = currentPosition;
-        mapComponent.glView.requestRender();
     }
 
     public void setStartPosition(Position startPosition) {
         this.startPosition = startPosition;
-        mapComponent.glView.requestRender();
     }
 
     public void setEndPosition(Position endPosition) {
         this.endPosition = endPosition;
-        mapComponent.glView.requestRender();
     }
 
     public void setPath(double[] path) {
         this.path = path;
-        mapComponent.glView.requestRender();
     }
 
     @Override
@@ -438,8 +433,6 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         double x = (preX - postX) * mercatorPixelSize;
         double y = (preY - postY) * mercatorPixelSize;
         setPos(posX + x * azimuthCos + y * azimuthSin, posY + y * azimuthCos - x * azimuthSin);
-
-        mapComponent.glView.requestRender();
     }
 
     public void moveDouble(float preX1, float preY1, float preX2, float preY2,
@@ -474,8 +467,6 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         double posX2 = posX1 - (postX1 * azimuthCos + postY1 * azimuthSin) * mercatorPixelSize;
         double posY2 = posY1 - (postY1 * azimuthCos - postX1 * azimuthSin) * mercatorPixelSize;
         setPos(posX2, posY2);
-
-        mapComponent.glView.requestRender();
     }
 
     public void zoomIn(float x, float y) {
@@ -489,8 +480,6 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         double px = posX + (x * azimuthCos + y * azimuthSin) * (preMercatorPixelSize - mercatorPixelSize);
         double py = posY + (y * azimuthCos - x * azimuthSin) * (preMercatorPixelSize - mercatorPixelSize);
         setPos(px, py);
-
-        mapComponent.glView.requestRender();
     }
 
     private void setPos(double x, double y) {
@@ -561,7 +550,6 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         glBindTexture(GL_TEXTURE_2D, 0);
 
         tileCache.put(key, new TileCacheItem(textureId, tick));
-        mapComponent.glView.requestRender();
     }
 
     private void removeUnused() {

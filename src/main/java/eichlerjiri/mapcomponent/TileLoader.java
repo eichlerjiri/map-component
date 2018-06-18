@@ -165,7 +165,7 @@ public class TileLoader extends ThreadPoolExecutor {
     }
 
     public void cancelTile(final RequestedTile requestedTile) {
-        mapComponent.glView.queueEvent(new Runnable() {
+        mapComponent.queueEventOnDraw(new Runnable() {
             @Override
             public void run() {
                 if (requestedTile.cancelled) {
