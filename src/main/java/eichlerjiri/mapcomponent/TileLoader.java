@@ -13,6 +13,7 @@ import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import eichlerjiri.mapcomponent.utils.CatRunnable;
 import eichlerjiri.mapcomponent.utils.IOUtils;
 import eichlerjiri.mapcomponent.utils.MapTileKey;
 import eichlerjiri.mapcomponent.utils.RequestedTile;
@@ -153,7 +154,7 @@ public class TileLoader extends ThreadPoolExecutor {
     }
 
     private void returnTile(final MapTileKey tileKey, final int width, final int height, final ByteBuffer data) {
-        mapComponent.queueEventOnDraw(new Runnable() {
+        mapComponent.queueEventOnDraw(new CatRunnable(0) {
             @Override
             public void run() {
                 RequestedTile requestedTile = requestedTiles.remove(tileKey);
@@ -165,7 +166,7 @@ public class TileLoader extends ThreadPoolExecutor {
     }
 
     public void cancelTile(final RequestedTile requestedTile) {
-        mapComponent.queueEventOnDraw(new Runnable() {
+        mapComponent.queueEventOnDraw(new CatRunnable(0) {
             @Override
             public void run() {
                 if (requestedTile.cancelled) {

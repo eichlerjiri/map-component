@@ -4,6 +4,7 @@ import android.content.Context;
 import android.location.Location;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -12,9 +13,11 @@ import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import eichlerjiri.mapcomponent.utils.AndroidUtils;
+import eichlerjiri.mapcomponent.utils.CatRunnable;
 import eichlerjiri.mapcomponent.utils.CurrentPosition;
 import eichlerjiri.mapcomponent.utils.DoubleArrayList;
 import eichlerjiri.mapcomponent.utils.GeoBoundary;
@@ -28,7 +31,7 @@ public abstract class MapComponent extends RelativeLayout {
     public final TileLoader tileLoader;
     public final TileDownloader tileDownloader;
 
-    public final ConcurrentLinkedQueue<Runnable> onDrawRunnables = new ConcurrentLinkedQueue<>();
+    public final ConcurrentLinkedQueue<CatRunnable> onDrawRunnables = new ConcurrentLinkedQueue<>();
     private final GestureDetector gestureDetector;
 
     private final LinearLayout centerButtonLayout;
@@ -199,7 +202,17 @@ public abstract class MapComponent extends RelativeLayout {
         doSetPosition((x1 + x2) * 0.5, (y1 + y2) * 0.5, zoom, 0);
     }
 
-    public void queueEventOnDraw(Runnable runnable) {
+    public void queueEventOnDraw(CatRunnable runnable) {
+        if (runnable.category != 0) {
+            Iterator<CatRunnable> it = onDrawRunnables.iterator();
+            while (it.hasNext()) {
+                CatRunnable cur = it.next();
+                if (cur.category == runnable.category) {
+                    it.remove();
+                }
+            }
+        }
+
         onDrawRunnables.add(runnable);
         glView.requestRender();
     }
@@ -268,7 +281,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doMoveSingle(final float preX, final float preY, final float postX, final float postY) {
-        queueEventOnDraw(new Runnable() {
+        queueEventOnDraw(new CatRunnable(0) {
             @Override
             public void run() {
                 renderer.moveSingle(preX, preY, postX, postY);
@@ -278,7 +291,7 @@ public abstract class MapComponent extends RelativeLayout {
 
     private void doMoveDouble(final float preX1, final float preY1, final float preX2, final float preY2,
                               final float postX1, final float postY1, final float postX2, final float postY2) {
-        queueEventOnDraw(new Runnable() {
+        queueEventOnDraw(new CatRunnable(0) {
             @Override
             public void run() {
                 renderer.moveDouble(preX1, preY1, preX2, preY2, postX1, postY1, postX2, postY2);
@@ -287,7 +300,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doZoomIn(final float x, final float y) {
-        queueEventOnDraw(new Runnable() {
+        queueEventOnDraw(new CatRunnable(0) {
             @Override
             public void run() {
                 renderer.zoomIn(x, y);
@@ -296,7 +309,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doSetPosition(final double x, final double y, final float zoom, final float azimuth) {
-        queueEventOnDraw(new Runnable() {
+        queueEventOnDraw(new CatRunnable(1) {
             @Override
             public void run() {
                 renderer.setPosition(x, y, zoom, azimuth);
@@ -305,7 +318,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doSetCurrentPosition(final CurrentPosition position) {
-        queueEventOnDraw(new Runnable() {
+        queueEventOnDraw(new CatRunnable(2) {
             @Override
             public void run() {
                 renderer.setCurrentPosition(position);
@@ -314,7 +327,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doSetStartPosition(final Position startPosition) {
-        queueEventOnDraw(new Runnable() {
+        queueEventOnDraw(new CatRunnable(3) {
             @Override
             public void run() {
                 renderer.setStartPosition(startPosition);
@@ -323,7 +336,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doSetEndPosition(final Position endPosition) {
-        queueEventOnDraw(new Runnable() {
+        queueEventOnDraw(new CatRunnable(4) {
             @Override
             public void run() {
                 renderer.setEndPosition(endPosition);
@@ -332,7 +345,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     private void doSetPath(final double[] path) {
-        queueEventOnDraw(new Runnable() {
+        queueEventOnDraw(new CatRunnable(5) {
             @Override
             public void run() {
                 renderer.setPath(path);

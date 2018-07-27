@@ -573,7 +573,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         int tilesNecessaryBase = (int) (Math.sqrt(w * w + h * h) / tileSize);
         searchDist = 1 + tilesNecessaryBase / 2;
 
-        if (w != 0 & h != 0) {
+        if (w != 0 && h != 0) {
             Matrix.orthoM(mapMatrix, 0, 0, w, h, 0, -10, 10);
         } else {
             Matrix.setIdentityM(mapMatrix, 0);
