@@ -1,10 +1,8 @@
 package eichlerjiri.mapcomponent;
 
 import android.content.Context;
-import android.location.Location;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -13,27 +11,24 @@ import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
-import eichlerjiri.mapcomponent.utils.AndroidUtils;
-import eichlerjiri.mapcomponent.utils.CatRunnable;
-import eichlerjiri.mapcomponent.utils.CurrentPosition;
-import eichlerjiri.mapcomponent.utils.DoubleArrayList;
-import eichlerjiri.mapcomponent.utils.GeoBoundary;
-import eichlerjiri.mapcomponent.utils.MercatorUtils;
-import eichlerjiri.mapcomponent.utils.Position;
+import eichlerjiri.mapcomponent.tiles.TileDownloadPool;
+import eichlerjiri.mapcomponent.tiles.TileLoadPool;
+
+import static eichlerjiri.mapcomponent.utils.Common.*;
 
 public abstract class MapComponent extends RelativeLayout {
 
     public final GLSurfaceView glView;
     public final MapComponentRenderer renderer = new MapComponentRenderer(this);
-    public final TileLoader tileLoader;
-    public final TileDownloader tileDownloader;
 
-    public final ConcurrentLinkedQueue<CatRunnable> onDrawRunnables = new ConcurrentLinkedQueue<>();
+    private final MapData d = new MapData();
+    public volatile MapData dCommited = new MapData();
+
+    public final TileLoadPool tileLoadPool;
+    public final TileDownloadPool tileDownloadPool;
+
     private final GestureDetector gestureDetector;
-
     private final LinearLayout centerButtonLayout;
 
     private float lastX1 = Float.MIN_VALUE;
@@ -46,8 +41,8 @@ public abstract class MapComponent extends RelativeLayout {
     public MapComponent(Context context, ArrayList<String> mapUrls) {
         super(context);
         glView = new GLSurfaceView(context);
-        tileLoader = new TileLoader(context, this);
-        tileDownloader = new TileDownloader(this, mapUrls);
+        tileLoadPool = new TileLoadPool(context, this);
+        tileDownloadPool = new TileDownloadPool(this, mapUrls);
 
         glView.setZOrderOnTop(true); // no black flash on load
         glView.setZOrderMediaOverlay(true);
@@ -58,7 +53,7 @@ public abstract class MapComponent extends RelativeLayout {
         centerButtonLayout.addView(centerButton);
         centerButtonLayout.setBackgroundColor(0x99ffffff);
 
-        float spSize = AndroidUtils.spSize(context);
+        float spSize = spSize(context);
         int size = Math.round(40 * spSize);
         int margin = Math.round(10 * spSize);
 
@@ -75,7 +70,8 @@ public abstract class MapComponent extends RelativeLayout {
         gestureDetector = new GestureDetector(new GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onDoubleTap(MotionEvent e) {
-                doZoomIn(e.getX(), e.getY());
+                zoomIn(e.getX(), e.getY());
+                commit();
                 return true;
             }
         });
@@ -91,18 +87,21 @@ public abstract class MapComponent extends RelativeLayout {
     public Bundle saveInstanceState() {
         Bundle ret = new Bundle();
 
-        ret.putDouble("posX", renderer.posX);
-        ret.putDouble("posY", renderer.posY);
-        ret.putFloat("zoom", renderer.zoom);
-        ret.putFloat("azimuth", renderer.azimuth);
+        ret.putDouble("posX", d.posX);
+        ret.putDouble("posY", d.posY);
+        ret.putFloat("zoom", d.zoom);
+        ret.putFloat("azimuth", d.azimuth);
         ret.putBoolean("centered", centered);
 
         return ret;
     }
 
     public void restoreInstanceState(final Bundle bundle) {
-        doSetPosition(bundle.getDouble("posX"), bundle.getDouble("posY"), bundle.getFloat("zoom"),
-                bundle.getFloat("azimuth"));
+        d.posX = bundle.getDouble("posX");
+        d.posY = bundle.getDouble("posY");
+        d.zoom = bundle.getFloat("zoom");
+        d.azimuth = bundle.getFloat("azimuth");
+        commit();
 
         if (bundle.getBoolean("centered")) {
             startCentering();
@@ -128,92 +127,30 @@ public abstract class MapComponent extends RelativeLayout {
         }
     }
 
-    public void setCurrentPosition(Location location) {
-        if (location != null) {
-            double x = MercatorUtils.lonToMercatorX(location.getLongitude());
-            double y = MercatorUtils.latToMercatorY(location.getLatitude());
-            float bearing = location.hasBearing() ? location.getBearing() : Float.MIN_VALUE;
-            doSetCurrentPosition(new CurrentPosition(x, y, bearing));
-        } else {
-            doSetCurrentPosition(null);
-        }
+    public void setCurrentPosition(double x, double y, float azimuth) {
+        d.currentPositionX = x;
+        d.currentPositionY = y;
+        d.currentPositionAzimuth = azimuth;
     }
 
-    public void setStartPosition(double lat, double lon) {
-        if (lat == Double.MIN_VALUE) {
-            doSetStartPosition(null);
-        } else {
-            doSetStartPosition(new Position(MercatorUtils.lonToMercatorX(lon), MercatorUtils.latToMercatorY(lat)));
-        }
+    public void setStartPosition(double x, double y) {
+        d.startPositionX = x;
+        d.startPositionY = y;
     }
 
-    public void setEndPosition(double lat, double lon) {
-        if (lat == Double.MIN_VALUE) {
-            doSetEndPosition(null);
-        } else {
-            doSetEndPosition(new Position(MercatorUtils.lonToMercatorX(lon), MercatorUtils.latToMercatorY(lat)));
-        }
+    public void setEndPosition(double x, double y) {
+        d.endPositionX = x;
+        d.endPositionY = y;
     }
 
-    public void setPath(DoubleArrayList positions) {
-        if (positions == null) {
-            doSetPath(null);
-        } else {
-            double[] mercatorPos = new double[positions.size];
-            for (int i = 0; i < positions.size; i += 2) {
-                mercatorPos[i] = MercatorUtils.lonToMercatorX(positions.data[i + 1]);
-                mercatorPos[i + 1] = MercatorUtils.latToMercatorY(positions.data[i]);
-            }
-            doSetPath(mercatorPos);
-        }
+    public void setPath(double[] path, int offset, int length) {
+        d.path = path;
+        d.pathOffset = offset;
+        d.pathLength = length;
     }
 
-    public void moveTo(double lat, double lon, float zoom, float azimuth) {
-        doSetPosition(MercatorUtils.lonToMercatorX(lon), MercatorUtils.latToMercatorY(lat), zoom, azimuth);
-    }
-
-    public void moveToBoundary(GeoBoundary geoBoundary, float viewWidth, float viewHeight,
-                               float defaultZoom, float padding) {
-        double x1 = MercatorUtils.lonToMercatorX(geoBoundary.minLon);
-        double y1 = MercatorUtils.latToMercatorY(geoBoundary.minLat);
-        double x2 = MercatorUtils.lonToMercatorX(geoBoundary.maxLon);
-        double y2 = MercatorUtils.latToMercatorY(geoBoundary.maxLat);
-
-        double diffX = x2 - x1;
-        double diffY = y1 - y2;
-
-        float pixPadding = padding * 2 * AndroidUtils.spSize(getContext());
-        if (viewWidth - pixPadding > 0) {
-            viewWidth -= pixPadding;
-        }
-        if (viewHeight - pixPadding > 0) {
-            viewHeight -= pixPadding;
-        }
-
-        double log2 = 1 / Math.log(2);
-        double zoomX = Math.log(viewWidth / (renderer.tileSize * diffX)) * log2;
-        double zoomY = Math.log(viewHeight / (renderer.tileSize * diffY)) * log2;
-
-        float zoom = (float) Math.min(zoomX, zoomY);
-        if (zoom != zoom || zoom == Float.NEGATIVE_INFINITY || zoom == Float.POSITIVE_INFINITY) {
-            zoom = defaultZoom;
-        }
-
-        doSetPosition((x1 + x2) * 0.5, (y1 + y2) * 0.5, zoom, 0);
-    }
-
-    public void queueEventOnDraw(CatRunnable runnable) {
-        if (runnable.category != 0) {
-            Iterator<CatRunnable> it = onDrawRunnables.iterator();
-            while (it.hasNext()) {
-                CatRunnable cur = it.next();
-                if (cur.category == runnable.category) {
-                    it.remove();
-                }
-            }
-        }
-
-        onDrawRunnables.add(runnable);
+    public void commit() {
+        dCommited = d.copy();
         glView.requestRender();
     }
 
@@ -260,7 +197,8 @@ public abstract class MapComponent extends RelativeLayout {
                 if (id == 0) {
                     if (lastX2 == Float.MIN_VALUE) {
                         stopCentering();
-                        doMoveSingle(lastX1, lastY1, x, y);
+                        moveSingle(lastX1, lastY1, x, y);
+                        commit();
                     }
 
                     lastX1 = x;
@@ -273,88 +211,158 @@ public abstract class MapComponent extends RelativeLayout {
 
             if (lastX1 != Float.MIN_VALUE && lastX2 != Float.MIN_VALUE) {
                 stopCentering();
-                doMoveDouble(preX1, preY1, preX2, preY2, lastX1, lastY1, lastX2, lastY2);
+                moveDouble(preX1, preY1, preX2, preY2, lastX1, lastY1, lastX2, lastY2);
+                commit();
             }
         }
 
         return true;
     }
 
-    private void doMoveSingle(final float preX, final float preY, final float postX, final float postY) {
-        queueEventOnDraw(new CatRunnable(0) {
-            @Override
-            public void run() {
-                renderer.moveSingle(preX, preY, postX, postY);
-            }
-        });
+    public void setPosition(double x, double y) {
+        while (x < 0) {
+            x++;
+        }
+        while (x > 1) {
+            x--;
+        }
+
+        if (y < 0) {
+            y = 0;
+        } else if (y > 1) {
+            y = 1;
+        }
+
+        d.posX = x;
+        d.posY = y;
     }
 
-    private void doMoveDouble(final float preX1, final float preY1, final float preX2, final float preY2,
-                              final float postX1, final float postY1, final float postX2, final float postY2) {
-        queueEventOnDraw(new CatRunnable(0) {
-            @Override
-            public void run() {
-                renderer.moveDouble(preX1, preY1, preX2, preY2, postX1, postY1, postX2, postY2);
-            }
-        });
+    public void setZoom(float zoom) {
+        if (zoom < 0) {
+            zoom = 0;
+        } else if (zoom > 20) {
+            zoom = 20;
+        }
+
+        d.zoom = zoom;
     }
 
-    private void doZoomIn(final float x, final float y) {
-        queueEventOnDraw(new CatRunnable(0) {
-            @Override
-            public void run() {
-                renderer.zoomIn(x, y);
-            }
-        });
+    public void setAzimuth(float azimuth) {
+        while (azimuth < 0) {
+            azimuth += 360;
+        }
+        while (azimuth > 360) {
+            azimuth -= 360;
+        }
+
+        d.azimuth = azimuth;
     }
 
-    private void doSetPosition(final double x, final double y, final float zoom, final float azimuth) {
-        queueEventOnDraw(new CatRunnable(1) {
-            @Override
-            public void run() {
-                renderer.setPosition(x, y, zoom, azimuth);
-            }
-        });
+    public void moveToBoundary(double x1, double y1, double x2, double y2, float defaultZoom, float padding) {
+        setPosition((x1 + x2) * 0.5, (y1 + y2) * 0.5);
+
+        double diffX = x2 - x1;
+        double diffY = y2 - y1;
+
+        float width = glView.getWidth();
+        float height = glView.getHeight();
+
+        float pixPadding = padding * 2 * spSize(getContext());
+        if (width - pixPadding > 0) {
+            width -= pixPadding;
+        }
+        if (height - pixPadding > 0) {
+            height -= pixPadding;
+        }
+
+        double log2 = 1 / Math.log(2);
+        double zoomX = Math.log(width / (renderer.tileSize * diffX)) * log2;
+        double zoomY = Math.log(height / (renderer.tileSize * diffY)) * log2;
+
+        float zoom = (float) Math.min(zoomX, zoomY);
+        if (zoom != zoom || zoom == Float.NEGATIVE_INFINITY || zoom == Float.POSITIVE_INFINITY) {
+            zoom = defaultZoom;
+        }
+
+        setZoom(zoom);
+        setAzimuth(0);
     }
 
-    private void doSetCurrentPosition(final CurrentPosition position) {
-        queueEventOnDraw(new CatRunnable(2) {
-            @Override
-            public void run() {
-                renderer.setCurrentPosition(position);
-            }
-        });
+    public void moveSingle(float preX, float preY, float postX, float postY) {
+        double mercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
+        double x = (preX - postX) * mercatorPixelSize;
+        double y = (preY - postY) * mercatorPixelSize;
+
+        double rad = Math.toRadians(d.azimuth);
+        double azimuthCos = Math.cos(rad);
+        double azimuthSin = Math.sin(rad);
+
+        setPosition(d.posX + x * azimuthCos + y * azimuthSin, d.posY + y * azimuthCos - x * azimuthSin);
     }
 
-    private void doSetStartPosition(final Position startPosition) {
-        queueEventOnDraw(new CatRunnable(3) {
-            @Override
-            public void run() {
-                renderer.setStartPosition(startPosition);
-            }
-        });
+    public void moveDouble(float preX1, float preY1, float preX2, float preY2,
+                           float postX1, float postY1, float postX2, float postY2) {
+        double preMercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
+
+        float preDist = computeDistance(preX1, preY1, preX2, preY2);
+        float postDist = computeDistance(postX1, postY1, postX2, postY2);
+        float diff = postDist / preDist;
+        if (diff != diff) { // NaN result
+            return;
+        }
+
+        setZoom(d.zoom + (float) (Math.log(diff) / Math.log(2)));
+
+        double mercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
+
+        float surfaceCenterX = glView.getWidth() * 0.5f;
+        float surfaceCenterY = glView.getHeight() * 0.5f;
+        preX1 -= surfaceCenterX;
+        preY1 -= surfaceCenterY;
+        preX2 -= surfaceCenterX;
+        preY2 -= surfaceCenterY;
+        postX1 -= surfaceCenterX;
+        postY1 -= surfaceCenterY;
+        postX2 -= surfaceCenterX;
+        postY2 -= surfaceCenterY;
+
+        double rad = Math.toRadians(d.azimuth);
+        double azimuthCos = Math.cos(rad);
+        double azimuthSin = Math.sin(rad);
+
+        double posX1 = d.posX + (preX1 * azimuthCos + preY1 * azimuthSin) * preMercatorPixelSize;
+        double posY1 = d.posY + (preY1 * azimuthCos - preX1 * azimuthSin) * preMercatorPixelSize;
+
+        double lastAngle = Math.atan2(preX2 - preX1, preY2 - preY1);
+        double angle = Math.atan2(postX2 - postX1, postY2 - postY1);
+        setAzimuth(d.azimuth + (float) Math.toDegrees(lastAngle - angle));
+
+        double posX2 = posX1 - (postX1 * azimuthCos + postY1 * azimuthSin) * mercatorPixelSize;
+        double posY2 = posY1 - (postY1 * azimuthCos - postX1 * azimuthSin) * mercatorPixelSize;
+        setPosition(posX2, posY2);
     }
 
-    private void doSetEndPosition(final Position endPosition) {
-        queueEventOnDraw(new CatRunnable(4) {
-            @Override
-            public void run() {
-                renderer.setEndPosition(endPosition);
-            }
-        });
-    }
+    public void zoomIn(float x, float y) {
+        double preMercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
 
-    private void doSetPath(final double[] path) {
-        queueEventOnDraw(new CatRunnable(5) {
-            @Override
-            public void run() {
-                renderer.setPath(path);
-            }
-        });
+        setZoom(Math.round(d.zoom + 1));
+
+        double mercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
+
+        x -= glView.getWidth() * 0.5f;
+        y -= glView.getHeight() * 0.5f;
+
+        double rad = Math.toRadians(d.azimuth);
+        double azimuthCos = Math.cos(rad);
+        double azimuthSin = Math.sin(rad);
+
+        double px = d.posX + (x * azimuthCos + y * azimuthSin) * (preMercatorPixelSize - mercatorPixelSize);
+        double py = d.posY + (y * azimuthCos - x * azimuthSin) * (preMercatorPixelSize - mercatorPixelSize);
+        setPosition(px, py);
     }
 
     public void close() {
-        tileLoader.shutdownNow();
-        tileDownloader.shutdownNow();
+        tileLoadPool.shutdownNow();
+        tileDownloadPool.shutdownNow();
     }
 }

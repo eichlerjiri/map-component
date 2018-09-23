@@ -1,25 +1,9 @@
 package eichlerjiri.mapcomponent.shaders;
 
-import eichlerjiri.mapcomponent.utils.GLUtils;
-
 import static android.opengl.GLES20.*;
+import static eichlerjiri.mapcomponent.utils.Common.*;
 
 public class ColorShader {
-
-    private static final String vertexShaderSource = "" +
-            "attribute vec2 vertex;\n" +
-            "uniform mat4 pvm;\n" +
-            "\n" +
-            "void main() {\n" +
-            "    gl_Position = pvm * vec4(vertex,0,1);\n" +
-            "}\n";
-
-    private static final String fragmentShaderSource = "precision mediump float;" +
-            "uniform vec4 color;\n" +
-            "\n" +
-            "void main() {\n" +
-            "    gl_FragColor = color;\n" +
-            "}\n";
 
     private final int programId;
 
@@ -28,14 +12,30 @@ public class ColorShader {
     private final int colorLoc;
 
     public ColorShader() {
-        programId = GLUtils.createProgram(vertexShaderSource, fragmentShaderSource);
+        String vertexShaderSource = "" +
+                "attribute vec2 vertex;\n" +
+                "uniform mat4 pvm;\n" +
+                "\n" +
+                "void main() {\n" +
+                "    gl_Position = pvm * vec4(vertex,0,1);\n" +
+                "}\n";
+
+        String fragmentShaderSource = "precision mediump float;\n" +
+                "uniform vec4 color;\n" +
+                "\n" +
+                "void main() {\n" +
+                "    gl_FragColor = color;\n" +
+                "}\n";
+
+        programId = createProgram(vertexShaderSource, fragmentShaderSource);
 
         vertexLoc = glGetAttribLocation(programId, "vertex");
         pvmLoc = glGetUniformLocation(programId, "pvm");
         colorLoc = glGetUniformLocation(programId, "color");
     }
 
-    public void render(float[] pvm, int buffer, int bufferCount, int drawType, float r, float g, float b, float a) {
+    public void render(float[] pvm, int buffer, int bufferCount, int drawType,
+                       float r, float g, float b, float a) {
         glUseProgram(programId);
         glEnableVertexAttribArray(vertexLoc);
 

@@ -1,29 +1,9 @@
 package eichlerjiri.mapcomponent.shaders;
 
-import eichlerjiri.mapcomponent.utils.GLUtils;
-
 import static android.opengl.GLES20.*;
+import static eichlerjiri.mapcomponent.utils.Common.*;
 
 public class MapShader {
-
-    private static final String vertexShaderSource = "" +
-            "attribute vec2 vertex;\n" +
-            "uniform mat4 pvm;\n" +
-            "uniform vec4 scaleShift;\n" +
-            "varying vec2 texCoord;\n" +
-            "\n" +
-            "void main() {\n" +
-            "    texCoord = vec2(vertex.x * scaleShift.x + scaleShift.z, vertex.y * scaleShift.y + scaleShift.w);\n" +
-            "    gl_Position = pvm * vec4(vertex,0,1);\n" +
-            "}\n";
-
-    private static final String fragmentShaderSource = "precision mediump float;" +
-            "varying vec2 texCoord;\n" +
-            "uniform sampler2D texture;\n" +
-            "\n" +
-            "void main() {\n" +
-            "    gl_FragColor = texture2D(texture, texCoord);\n" +
-            "}\n";
 
     private final int programId;
 
@@ -32,7 +12,27 @@ public class MapShader {
     private final int scaleShiftLoc;
 
     public MapShader() {
-        programId = GLUtils.createProgram(vertexShaderSource, fragmentShaderSource);
+        String vertexShaderSource = "" +
+                "attribute vec2 vertex;\n" +
+                "uniform mat4 pvm;\n" +
+                "uniform vec4 scaleShift;\n" +
+                "varying vec2 texCoord;\n" +
+                "\n" +
+                "void main() {\n" +
+                "    texCoord = vec2(vertex.x * scaleShift.x + scaleShift.z," +
+                " vertex.y * scaleShift.y + scaleShift.w);\n" +
+                "    gl_Position = pvm * vec4(vertex,0,1);\n" +
+                "}\n";
+
+        String fragmentShaderSource = "precision mediump float;" +
+                "varying vec2 texCoord;\n" +
+                "uniform sampler2D texture;\n" +
+                "\n" +
+                "void main() {\n" +
+                "    gl_FragColor = texture2D(texture, texCoord);\n" +
+                "}\n";
+
+        programId = createProgram(vertexShaderSource, fragmentShaderSource);
 
         vertexLoc = glGetAttribLocation(programId, "vertex");
         pvmLoc = glGetUniformLocation(programId, "pvm");

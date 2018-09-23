@@ -9,7 +9,7 @@ public class FloatArrayList {
         size = 0;
     }
 
-    private void ensureCapacity(int extra) {
+    public void ensureCapacity(int extra) {
         int newCapacity = data.length * 2;
         while (newCapacity < size + extra) {
             newCapacity *= 2;
@@ -18,16 +18,6 @@ public class FloatArrayList {
         float[] dataNew = new float[newCapacity];
         System.arraycopy(data, 0, dataNew, 0, size);
         data = dataNew;
-    }
-
-    public void add(float v0, float v1) {
-        if (data.length < size + 2) {
-            ensureCapacity(2);
-        }
-
-        data[size] = v0;
-        data[size + 1] = v1;
-        size += 2;
     }
 
     public void add(float v0, float v1, float v2, float v3, float v4, float v5,

@@ -1,20 +1,94 @@
 package eichlerjiri.mapcomponent.utils;
 
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 
-public class IOUtils {
+import static android.opengl.GLES20.*;
+
+public class Common {
+
+    public static double mercatorPixelSize(float tileSize, float zoom) {
+        return 1 / (tileSize * Math.pow(2, zoom));
+    }
+
+    public static float computeDistance(float x1, float y1, float x2, float y2) {
+        float xDiff = x1 - x2;
+        float yDiff = y1 - y2;
+        return (float) Math.sqrt(xDiff * xDiff + yDiff * yDiff);
+    }
+
+    public static float spSize(Context context) {
+        return context.getResources().getDisplayMetrics().scaledDensity;
+    }
+
+    public static LoadedTile decodeTile(MapTileKey tileKey, byte[] data) {
+        if (data == null) {
+            return new LoadedTile(tileKey, 0, 0, null);
+        }
+
+        Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+        if (bitmap == null) {
+            return new LoadedTile(tileKey, 0, 0, null);
+        }
+
+        if (bitmap.getConfig() != Bitmap.Config.ARGB_8888) {
+            Log.w("TileLoadPool", "Converting bitmap");
+            bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+        }
+
+        ByteBuffer buffer = ByteBuffer.allocateDirect(bitmap.getByteCount());
+        bitmap.copyPixelsToBuffer(buffer);
+        buffer.rewind();
+
+        return new LoadedTile(tileKey, bitmap.getWidth(), bitmap.getHeight(), buffer);
+    }
+
+    public static int createProgram(String vertexShaderSource, String fragmentShaderSource) {
+        int vertexShaderId = prepareShader(GL_VERTEX_SHADER, vertexShaderSource);
+        int fragmentShaderId = prepareShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
+
+        int programId = glCreateProgram();
+        glAttachShader(programId, vertexShaderId);
+        glAttachShader(programId, fragmentShaderId);
+        glLinkProgram(programId);
+        return programId;
+    }
+
+    public static int prepareShader(int type, String shaderCode) {
+        int shaderId = glCreateShader(type);
+
+        glShaderSource(shaderId, shaderCode);
+        glCompileShader(shaderId);
+
+        return shaderId;
+    }
+
+    public static int prepareStaticBuffer(float[] data, int[] itmp1) {
+        glGenBuffers(1, itmp1, 0);
+        int id = itmp1[0];
+
+        glBindBuffer(GL_ARRAY_BUFFER, id);
+        glBufferData(GL_ARRAY_BUFFER, data.length * 4, FloatBuffer.wrap(data), GL_STATIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        return id;
+    }
 
     public static byte[] download(String url) throws InterruptedIOException {
         URLConnection conn = null;
@@ -94,19 +168,9 @@ public class IOUtils {
         }
     }
 
-    private static void closeStream(InputStream is) throws InterruptedIOException {
+    public static void closeStream(Closeable is) throws InterruptedIOException {
         try {
             is.close();
-        } catch (InterruptedIOException e) {
-            throw e;
-        } catch (IOException e) {
-            Log.e("IOUtils", "Cannot close stream", e);
-        }
-    }
-
-    private static void closeStream(OutputStream os) throws InterruptedIOException {
-        try {
-            os.close();
         } catch (InterruptedIOException e) {
             throw e;
         } catch (IOException e) {
