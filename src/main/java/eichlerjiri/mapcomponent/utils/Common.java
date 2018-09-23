@@ -150,7 +150,7 @@ public class Common {
 
     public static byte[] readAll(InputStream is) throws InterruptedIOException {
         try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(is.available());
             byte[] buffer = new byte[4096];
             while (true) {
                 int num = is.read(buffer);

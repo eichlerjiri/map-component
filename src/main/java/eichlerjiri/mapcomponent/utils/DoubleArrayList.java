@@ -25,8 +25,7 @@ public class DoubleArrayList {
             ensureCapacity(2);
         }
 
-        data[size] = v0;
-        data[size + 1] = v1;
-        size += 2;
+        data[size++] = v0;
+        data[size++] = v1;
     }
 }
