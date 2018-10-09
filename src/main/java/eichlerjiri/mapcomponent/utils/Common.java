@@ -177,4 +177,15 @@ public class Common {
             Log.e("IOUtils", "Cannot close stream", e);
         }
     }
+
+    public static void multiplyMM(float[] result, float[] first, float[] second) {
+        for (int i = 0; i < 16; i += 4) {
+            for (int j = 0; j < 4; j++) {
+                result[i + j] = first[j] * second[i]
+                        + first[j + 4] * second[i + 1]
+                        + first[j + 8] * second[i + 2]
+                        + first[j + 12] * second[i + 3];
+            }
+        }
+    }
 }

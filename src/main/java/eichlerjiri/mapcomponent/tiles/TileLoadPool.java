@@ -3,7 +3,6 @@ package eichlerjiri.mapcomponent.tiles;
 import android.content.Context;
 
 import java.io.File;
-import java.util.HashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -12,13 +11,14 @@ import java.util.concurrent.TimeUnit;
 import eichlerjiri.mapcomponent.MapComponent;
 import eichlerjiri.mapcomponent.utils.LoadedTile;
 import eichlerjiri.mapcomponent.utils.MapTileKey;
+import eichlerjiri.mapcomponent.utils.MapTileKeyHashMap;
 import eichlerjiri.mapcomponent.utils.RequestedTile;
 
 public class TileLoadPool extends ThreadPoolExecutor {
 
     public final MapComponent mc;
     public final File cacheDir;
-    private final HashMap<MapTileKey, RequestedTile> requestedTiles = new HashMap<>();
+    private final MapTileKeyHashMap<RequestedTile> requestedTiles = new MapTileKeyHashMap<>();
 
     public final ConcurrentLinkedQueue<RequestedTile> cancelledTiles = new ConcurrentLinkedQueue<>();
     public final ConcurrentLinkedQueue<LoadedTile> loadedTiles = new ConcurrentLinkedQueue<>();
@@ -50,14 +50,14 @@ public class TileLoadPool extends ThreadPoolExecutor {
         }
     }
 
-    public void requestTile(MapTileKey testTileKey, int tick, int priority) {
-        RequestedTile previousRunnable = requestedTiles.get(testTileKey);
+    public void requestTile(int z, int x, int y, int tick, int priority) {
+        RequestedTile previousRunnable = requestedTiles.get(z, x, y);
 
         if (previousRunnable != null) {
             previousRunnable.tick = tick;
             previousRunnable.cancelled = false;
         } else {
-            MapTileKey tileKey = new MapTileKey(testTileKey);
+            MapTileKey tileKey = new MapTileKey(z, x, y);
             RequestedTile requestedTile = new RequestedTile(tileKey, tick, priority);
             requestedTiles.put(tileKey, requestedTile);
 
@@ -66,9 +66,12 @@ public class TileLoadPool extends ThreadPoolExecutor {
     }
 
     public void cancelUnused(int tick) {
-        for (RequestedTile requestedTile : requestedTiles.values()) {
-            if (requestedTile.tick != tick) {
-                requestedTile.cancelled = true;
+        for (Object o : requestedTiles.values) {
+            if (o != null) {
+                RequestedTile tile = (RequestedTile) o;
+                if (tile.tick != tick) {
+                    tile.cancelled = true;
+                }
             }
         }
     }
