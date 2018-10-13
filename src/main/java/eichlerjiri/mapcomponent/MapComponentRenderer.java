@@ -13,6 +13,7 @@ import eichlerjiri.mapcomponent.shaders.MapShader;
 import eichlerjiri.mapcomponent.utils.CachedTile;
 import eichlerjiri.mapcomponent.utils.Common;
 import eichlerjiri.mapcomponent.utils.FloatArrayList;
+import eichlerjiri.mapcomponent.utils.GLProxy;
 import eichlerjiri.mapcomponent.utils.LoadedTile;
 import eichlerjiri.mapcomponent.utils.MapTileKeyHashMap;
 
@@ -71,6 +72,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     private float ftmpX;
     private float ftmpY;
 
+    private GLProxy gl;
     private MapData d;
     private int tick;
 
@@ -81,15 +83,15 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     }
 
     @Override
-    public void onSurfaceCreated(GL10 gl, EGLConfig config) {
-        glClearColor(0.8f, 0.97f, 1.0f, 1.0f);
+    public void onSurfaceCreated(GL10 gl10, EGLConfig config) {
+        gl = new GLProxy();
 
         tileCache.clear();
 
-        mapShader = new MapShader();
+        mapShader = new MapShader(gl);
 
         float[] mapBufferData = new float[]{0, 0, 0, 1, 1, 1, 1, 0};
-        mapVbuffer = prepareStaticBuffer(mapBufferData, itmp);
+        mapVbuffer = prepareStaticBuffer(gl, mapBufferData, itmp);
         mapVbufferCount = mapBufferData.length / 2;
 
         colorShader = null;
@@ -100,8 +102,8 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     }
 
     @Override
-    public void onSurfaceChanged(GL10 gl, int width, int height) {
-        glViewport(0, 0, width, height);
+    public void onSurfaceChanged(GL10 gl10, int width, int height) {
+        gl.glViewport(0, 0, width, height);
 
         w = width;
         h = height;
@@ -110,7 +112,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     }
 
     @Override
-    public void onDrawFrame(GL10 gl) {
+    public void onDrawFrame(GL10 gl10) {
         d = mapComponent.dCommited;
         tick++;
 
@@ -121,7 +123,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             refreshAzimuthValues();
         }
 
-        glClear(GL_COLOR_BUFFER_BIT);
+        //   gl.glClear(GL_COLOR_BUFFER_BIT);
 
         double centerX = tiles * d.posX;
         double centerY = tiles * d.posY;
@@ -143,13 +145,13 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
         if (d.path != null) {
             if (pathVbuffer == 0) {
-                glGenBuffers(1, itmp, 0);
+                gl.glGenBuffers(1, itmp, 0);
                 pathVbuffer = itmp[0];
             }
             drawPath(d.path, d.pathOffset, d.pathLength);
         } else if (pathVbuffer != 0) {
             itmp[0] = pathVbuffer;
-            glDeleteBuffers(1, itmp, 0);
+            gl.glDeleteBuffers(1, itmp, 0);
             pathVbuffer = 0;
         }
         if (d.startPositionX != Double.MIN_VALUE) {
@@ -164,10 +166,6 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     }
 
     private void drawTile(int tileXview, int tileY, int toCenter) {
-        if (tileY < 0 || tileY >= tiles) {
-            return;
-        }
-
         int tileX = tileXview;
         while (tileX < 0) {
             tileX += tiles;
@@ -176,16 +174,21 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             tileX -= tiles;
         }
 
+        // no tile - pole areas. So we don't need to call glClear
+        if (tileY < 0 || tileY >= tiles) {
+            drawTileEmpty(tileXview, tileY);
+            return;
+        }
+
         // regular tile, matching zoom
         int texture = getTexture(mapZoom, tileX, tileY, toCenter);
         if (texture != 0) {
             preparePoint(tileXview * tilesReversed, tileY * tilesReversed);
-
             Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, ftmpX, ftmpY, 0);
             Matrix.scaleM(tmpMatrix, 0, scale, scale, 1);
             Common.multiplyMM(tmpMatrix2, tmpMatrix, rotateMatrix);
 
-            mapShader.render(tmpMatrix2, mapVbuffer, mapVbufferCount, texture, GL_TRIANGLE_FAN, 1, 1, 0, 0);
+            mapShader.render(gl, tmpMatrix2, mapVbuffer, mapVbufferCount, texture, GL_TRIANGLE_FAN, 1, 1, 0, 0);
             return;
         }
 
@@ -206,7 +209,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
                 float shiftX = scaleTile * (tileX - testX * zoomDiffTiles);
                 float shiftY = scaleTile * (tileY - testY * zoomDiffTiles);
 
-                mapShader.render(tmpMatrix2, mapVbuffer, mapVbufferCount, texture, GL_TRIANGLE_FAN,
+                mapShader.render(gl, tmpMatrix2, mapVbuffer, mapVbufferCount, texture, GL_TRIANGLE_FAN,
                         scaleTile, scaleTile, shiftX, shiftY);
                 return;
             }
@@ -215,6 +218,8 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             testX /= 2;
             testY /= 2;
         }
+
+        drawTileEmpty(tileXview, tileY);
 
         // try one higher zoom, for zooming out
         testZoom = mapZoom + 1;
@@ -232,10 +237,22 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
                     Matrix.scaleM(tmpMatrix, 0, scale * 0.5f, scale * 0.5f, 1);
                     Common.multiplyMM(tmpMatrix2, tmpMatrix, rotateMatrix);
 
-                    mapShader.render(tmpMatrix2, mapVbuffer, mapVbufferCount, texture, GL_TRIANGLE_FAN, 1, 1, 0, 0);
+                    mapShader.render(gl, tmpMatrix2, mapVbuffer, mapVbufferCount, texture, GL_TRIANGLE_FAN, 1, 1, 0, 0);
                 }
             }
         }
+    }
+
+    private void drawTileEmpty(int tileXview, int tileY) {
+        preparePoint(tileXview * tilesReversed, tileY * tilesReversed);
+        Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, ftmpX, ftmpY, 0);
+        Matrix.scaleM(tmpMatrix, 0, scale, scale, 1);
+        Common.multiplyMM(tmpMatrix2, tmpMatrix, rotateMatrix);
+
+        if (colorShader == null) {
+            colorShader = new ColorShader(gl);
+        }
+        colorShader.render(gl, tmpMatrix2, mapVbuffer, mapVbufferCount, GL_TRIANGLE_FAN, 0.8f, 0.97f, 1.0f, 1.0f);
     }
 
     private int getTexture(int z, int x, int y, int priority) {
@@ -255,7 +272,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
     private void drawCurrentPosition(double x, double y, float positionAzimuth) {
         if (colorShader == null) {
-            colorShader = new ColorShader();
+            colorShader = new ColorShader(gl);
         }
 
         preparePoint(x, y);
@@ -267,13 +284,13 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
                 for (int i = 0; i < data.length; i++) {
                     data[i] *= spSize;
                 }
-                currentPositionVbuffer = prepareStaticBuffer(data, itmp);
+                currentPositionVbuffer = prepareStaticBuffer(gl, data, itmp);
                 currentPositionVbufferCount = data.length / 2;
             }
 
             Matrix.rotateM(tmpMatrix, 0, azimuth + positionAzimuth, 0, 0, 1);
 
-            colorShader.render(tmpMatrix, currentPositionVbuffer, currentPositionVbufferCount, GL_TRIANGLES,
+            colorShader.render(gl, tmpMatrix, currentPositionVbuffer, currentPositionVbufferCount, GL_TRIANGLES,
                     0, 0, 1, 1);
         } else {
             if (nodirCurrentPositionVbuffer == 0) {
@@ -286,32 +303,32 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
                 for (int i = 0; i < data.length; i++) {
                     data[i] *= spSize;
                 }
-                nodirCurrentPositionVbuffer = prepareStaticBuffer(data, itmp);
+                nodirCurrentPositionVbuffer = prepareStaticBuffer(gl, data, itmp);
                 nodirCurrentPositionVbufferCount = data.length / 2;
             }
 
-            colorShader.render(tmpMatrix, nodirCurrentPositionVbuffer, nodirCurrentPositionVbufferCount, GL_TRIANGLES,
-                    0, 0, 1, 1);
+            colorShader.render(gl, tmpMatrix, nodirCurrentPositionVbuffer, nodirCurrentPositionVbufferCount,
+                    GL_TRIANGLES, 0, 0, 1, 1);
         }
     }
 
     private void drawPosition(double positionX, double positionY, float r, float g, float b, float a) {
         if (colorShader == null) {
-            colorShader = new ColorShader();
+            colorShader = new ColorShader(gl);
         }
         if (positionVbuffer == 0) {
             float[] data = new float[]{0, 0, 10, -20, -10, -20};
             for (int i = 0; i < data.length; i++) {
                 data[i] *= spSize;
             }
-            positionVbuffer = prepareStaticBuffer(data, itmp);
+            positionVbuffer = prepareStaticBuffer(gl, data, itmp);
             positionVbufferCount = data.length / 2;
         }
 
         preparePoint(positionX, positionY);
         Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, ftmpX, ftmpY, 0);
 
-        colorShader.render(tmpMatrix, positionVbuffer, positionVbufferCount, GL_TRIANGLES, r, g, b, a);
+        colorShader.render(gl, tmpMatrix, positionVbuffer, positionVbufferCount, GL_TRIANGLES, r, g, b, a);
     }
 
     private void drawPath(double[] path, int offset, int length) {
@@ -319,7 +336,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             return;
         }
         if (colorShader == null) {
-            colorShader = new ColorShader();
+            colorShader = new ColorShader(gl);
         }
 
         preparePoint(path[offset], path[offset + 1]);
@@ -380,11 +397,10 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             fbtmp = FloatBuffer.wrap(fltmp.data);
         }
 
-        glBindBuffer(GL_ARRAY_BUFFER, pathVbuffer);
-        glBufferData(GL_ARRAY_BUFFER, fltmp.size * 4, fbtmp, GL_DYNAMIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        gl.glBindBuffer(GL_ARRAY_BUFFER, pathVbuffer);
+        gl.glBufferData(GL_ARRAY_BUFFER, fltmp.size * 4, fbtmp, GL_DYNAMIC_DRAW);
 
-        colorShader.render(mapMatrix, pathVbuffer, fltmp.size / 2, GL_TRIANGLES, 0, 0, 0, 1);
+        colorShader.render(gl, mapMatrix, pathVbuffer, fltmp.size / 2, GL_TRIANGLES, 0, 0, 0, 1);
 
         fltmp.clear();
     }
@@ -403,20 +419,17 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             return;
         }
 
-        glGenTextures(1, itmp, 0);
+        gl.glGenTextures(1, itmp, 0);
         int textureId = itmp[0];
 
-        glBindTexture(GL_TEXTURE_2D, textureId);
-
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, loadedTile.width, loadedTile.height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+        gl.glBindTexture(GL_TEXTURE_2D, textureId);
+        gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, loadedTile.width, loadedTile.height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                 loadedTile.data);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-        glBindTexture(GL_TEXTURE_2D, 0);
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         tileCache.put(loadedTile.tileKey, new CachedTile(textureId, tick));
     }
@@ -428,7 +441,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
                 if (item.tick != tick) {
                     if (item.textureId != 0) {
                         itmp[0] = item.textureId;
-                        glDeleteTextures(1, itmp, 0);
+                        gl.glDeleteTextures(1, itmp, 0);
                     }
                     tileCache.remove(i--);
                 }

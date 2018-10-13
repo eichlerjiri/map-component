@@ -55,6 +55,7 @@ public class TileLoadPool extends ThreadPoolExecutor {
 
         if (previousRunnable != null) {
             previousRunnable.tick = tick;
+            previousRunnable.priority = priority;
             previousRunnable.cancelled = false;
         } else {
             MapTileKey tileKey = new MapTileKey(z, x, y);

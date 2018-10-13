@@ -59,33 +59,32 @@ public class Common {
         return new LoadedTile(tileKey, bitmap.getWidth(), bitmap.getHeight(), buffer);
     }
 
-    public static int createProgram(String vertexShaderSource, String fragmentShaderSource) {
-        int vertexShaderId = prepareShader(GL_VERTEX_SHADER, vertexShaderSource);
-        int fragmentShaderId = prepareShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
+    public static int createProgram(GLProxy gl, String vertexShaderSource, String fragmentShaderSource) {
+        int vertexShaderId = prepareShader(gl, GL_VERTEX_SHADER, vertexShaderSource);
+        int fragmentShaderId = prepareShader(gl, GL_FRAGMENT_SHADER, fragmentShaderSource);
 
-        int programId = glCreateProgram();
-        glAttachShader(programId, vertexShaderId);
-        glAttachShader(programId, fragmentShaderId);
-        glLinkProgram(programId);
+        int programId = gl.glCreateProgram();
+        gl.glAttachShader(programId, vertexShaderId);
+        gl.glAttachShader(programId, fragmentShaderId);
+        gl.glLinkProgram(programId);
         return programId;
     }
 
-    public static int prepareShader(int type, String shaderCode) {
-        int shaderId = glCreateShader(type);
+    public static int prepareShader(GLProxy gl, int type, String shaderCode) {
+        int shaderId = gl.glCreateShader(type);
 
-        glShaderSource(shaderId, shaderCode);
-        glCompileShader(shaderId);
+        gl.glShaderSource(shaderId, shaderCode);
+        gl.glCompileShader(shaderId);
 
         return shaderId;
     }
 
-    public static int prepareStaticBuffer(float[] data, int[] itmp1) {
-        glGenBuffers(1, itmp1, 0);
+    public static int prepareStaticBuffer(GLProxy gl, float[] data, int[] itmp1) {
+        gl.glGenBuffers(1, itmp1, 0);
         int id = itmp1[0];
 
-        glBindBuffer(GL_ARRAY_BUFFER, id);
-        glBufferData(GL_ARRAY_BUFFER, data.length * 4, FloatBuffer.wrap(data), GL_STATIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        gl.glBindBuffer(GL_ARRAY_BUFFER, id);
+        gl.glBufferData(GL_ARRAY_BUFFER, data.length * 4, FloatBuffer.wrap(data), GL_STATIC_DRAW);
 
         return id;
     }
@@ -187,5 +186,16 @@ public class Common {
                         + first[j + 12] * second[i + 3];
             }
         }
+    }
+
+    public static boolean uniformTest4f(float[] data, float d0, float d1, float d2, float d3) {
+        if (data[0] != d0 || data[1] != d1 || data[2] != d2 || data[3] != d3) {
+            data[0] = d0;
+            data[1] = d1;
+            data[2] = d2;
+            data[3] = d3;
+            return false;
+        }
+        return true;
     }
 }
