@@ -3,7 +3,6 @@ package eichlerjiri.mapcomponent.tiles;
 import java.io.InterruptedIOException;
 
 import eichlerjiri.mapcomponent.MapComponent;
-import eichlerjiri.mapcomponent.utils.MapTileKey;
 import eichlerjiri.mapcomponent.utils.RequestedTile;
 
 import static eichlerjiri.mapcomponent.utils.Common.*;
@@ -23,9 +22,8 @@ public class TileDownloader extends TileRunnable {
                 priority = tile.priority;
                 mc.tileDownloadPool.execute(this);
             } else {
-                MapTileKey tileKey = tile.tileKey;
                 byte[] data = download(mc.tileDownloadPool.getServerUrl() +
-                        tileKey.zoom + "/" + tileKey.x + "/" + tileKey.y + ".png");
+                        tile.zoom + "/" + tile.x + "/" + tile.y + ".png");
 
                 mc.tileLoadPool.execute(new TileLoaderDownloaded(mc, tile, data));
             }

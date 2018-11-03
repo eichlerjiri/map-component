@@ -10,15 +10,14 @@ import java.util.concurrent.TimeUnit;
 
 import eichlerjiri.mapcomponent.MapComponent;
 import eichlerjiri.mapcomponent.utils.LoadedTile;
-import eichlerjiri.mapcomponent.utils.MapTileKey;
-import eichlerjiri.mapcomponent.utils.MapTileKeyHashMap;
+import eichlerjiri.mapcomponent.utils.TileKeyHashMap;
 import eichlerjiri.mapcomponent.utils.RequestedTile;
 
 public class TileLoadPool extends ThreadPoolExecutor {
 
     public final MapComponent mc;
     public final File cacheDir;
-    private final MapTileKeyHashMap<RequestedTile> requestedTiles = new MapTileKeyHashMap<>();
+    private final TileKeyHashMap<RequestedTile> requestedTiles = new TileKeyHashMap<>();
 
     public final ConcurrentLinkedQueue<RequestedTile> cancelledTiles = new ConcurrentLinkedQueue<>();
     public final ConcurrentLinkedQueue<LoadedTile> loadedTiles = new ConcurrentLinkedQueue<>();
@@ -35,7 +34,7 @@ public class TileLoadPool extends ThreadPoolExecutor {
         RequestedTile cancelledTile;
         while ((cancelledTile = cancelledTiles.poll()) != null) {
             if (cancelledTile.cancelled) {
-                requestedTiles.remove(cancelledTile.tileKey);
+                requestedTiles.remove(cancelledTile);
             } else {
                 execute(new TileLoader(mc, cancelledTile));
             }
@@ -43,7 +42,7 @@ public class TileLoadPool extends ThreadPoolExecutor {
 
         LoadedTile loadedTile;
         while ((loadedTile = loadedTiles.poll()) != null) {
-            RequestedTile requestedTile = requestedTiles.remove(loadedTile.tileKey);
+            RequestedTile requestedTile = requestedTiles.remove(loadedTile);
             if (!requestedTile.cancelled) {
                 mc.renderer.tileLoaded(loadedTile);
             }
@@ -58,21 +57,21 @@ public class TileLoadPool extends ThreadPoolExecutor {
             previousRunnable.priority = priority;
             previousRunnable.cancelled = false;
         } else {
-            MapTileKey tileKey = new MapTileKey(z, x, y);
-            RequestedTile requestedTile = new RequestedTile(tileKey, tick, priority);
-            requestedTiles.put(tileKey, requestedTile);
+            RequestedTile requestedTile = new RequestedTile(z, x, y, tick, priority);
+            requestedTiles.put(requestedTile, requestedTile);
 
             execute(new TileLoader(mc, requestedTile));
         }
     }
 
     public void cancelUnused(int tick) {
-        for (Object o : requestedTiles.values) {
-            if (o != null) {
-                RequestedTile tile = (RequestedTile) o;
+        for (TileKeyHashMap.Entry<RequestedTile> entry : requestedTiles.entries) {
+            while (entry != null) {
+                RequestedTile tile = entry.value;
                 if (tile.tick != tick) {
                     tile.cancelled = true;
                 }
+                entry = entry.next;
             }
         }
     }

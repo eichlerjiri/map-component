@@ -5,7 +5,6 @@ import java.io.InterruptedIOException;
 
 import eichlerjiri.mapcomponent.MapComponent;
 import eichlerjiri.mapcomponent.utils.LoadedTile;
-import eichlerjiri.mapcomponent.utils.MapTileKey;
 import eichlerjiri.mapcomponent.utils.RequestedTile;
 
 import static eichlerjiri.mapcomponent.utils.Common.*;
@@ -26,15 +25,13 @@ public class TileLoaderDownloaded extends TileRunnable {
                 priority = tile.priority;
                 mc.tileLoadPool.execute(this);
             } else {
-                MapTileKey tileKey = tile.tileKey;
-
-                LoadedTile loadedTile = decodeTile(tileKey, data);
+                LoadedTile loadedTile = decodeTile(tile, data);
                 mc.tileLoadPool.loadedTiles.add(loadedTile);
                 mc.glView.requestRender();
 
                 if (loadedTile.data != null) {
                     File cacheFile = new File(mc.tileLoadPool.cacheDir,
-                            "tiles/ " + tileKey.zoom + "/" + tileKey.x + "/" + tileKey.y + ".png");
+                            "tiles/ " + tile.zoom + "/" + tile.x + "/" + tile.y + ".png");
 
                     cacheFile.getParentFile().mkdirs();
                     writeFile(cacheFile, data);

@@ -37,7 +37,7 @@ public class Common {
         return context.getResources().getDisplayMetrics().scaledDensity;
     }
 
-    public static LoadedTile decodeTile(MapTileKey tileKey, byte[] data) {
+    public static LoadedTile decodeTile(TileKey tileKey, byte[] data) {
         if (data == null) {
             return new LoadedTile(tileKey, 0, 0, null);
         }

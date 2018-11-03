@@ -15,7 +15,7 @@ import eichlerjiri.mapcomponent.utils.Common;
 import eichlerjiri.mapcomponent.utils.FloatArrayList;
 import eichlerjiri.mapcomponent.utils.GLProxy;
 import eichlerjiri.mapcomponent.utils.LoadedTile;
-import eichlerjiri.mapcomponent.utils.MapTileKeyHashMap;
+import eichlerjiri.mapcomponent.utils.TileKeyHashMap;
 
 import static android.opengl.GLES20.*;
 import static eichlerjiri.mapcomponent.utils.Common.*;
@@ -26,7 +26,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     private final float spSize;
     public final float tileSize;
 
-    private final MapTileKeyHashMap<CachedTile> tileCache = new MapTileKeyHashMap<>();
+    private final TileKeyHashMap<CachedTile> tileCache = new TileKeyHashMap<>();
 
     private MapShader mapShader;
     private ColorShader colorShader;
@@ -122,8 +122,6 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         if (d.azimuth != azimuth) {
             refreshAzimuthValues();
         }
-
-        //   gl.glClear(GL_COLOR_BUFFER_BIT);
 
         double centerX = tiles * d.posX;
         double centerY = tiles * d.posY;
@@ -415,7 +413,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
     public void tileLoaded(LoadedTile loadedTile) {
         if (loadedTile.data == null) {
-            tileCache.put(loadedTile.tileKey, new CachedTile(0, tick));
+            tileCache.put(loadedTile, new CachedTile(0, tick));
             return;
         }
 
@@ -431,20 +429,21 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-        tileCache.put(loadedTile.tileKey, new CachedTile(textureId, tick));
+        tileCache.put(loadedTile, new CachedTile(textureId, tick));
     }
 
     private void removeUnused() {
-        for (int i = 0; i < tileCache.values.length; i++) {
-            CachedTile item = (CachedTile) tileCache.values[i];
-            if (item != null) {
+        for (TileKeyHashMap.Entry<CachedTile> entry : tileCache.entries) {
+            while (entry != null) {
+                CachedTile item = entry.value;
                 if (item.tick != tick) {
                     if (item.textureId != 0) {
                         itmp[0] = item.textureId;
                         gl.glDeleteTextures(1, itmp, 0);
                     }
-                    tileCache.remove(i--);
+                    tileCache.remove(entry);
                 }
+                entry = entry.next;
             }
         }
     }
