@@ -17,7 +17,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
 
 import static android.opengl.GLES20.*;
 
@@ -59,34 +58,24 @@ public class Common {
         return new LoadedTile(tileKey, bitmap.getWidth(), bitmap.getHeight(), buffer);
     }
 
-    public static int createProgram(GLProxy gl, String vertexShaderSource, String fragmentShaderSource) {
-        int vertexShaderId = prepareShader(gl, GL_VERTEX_SHADER, vertexShaderSource);
-        int fragmentShaderId = prepareShader(gl, GL_FRAGMENT_SHADER, fragmentShaderSource);
+    public static int createProgram(String vertexShaderSource, String fragmentShaderSource) {
+        int vertexShaderId = prepareShader(GL_VERTEX_SHADER, vertexShaderSource);
+        int fragmentShaderId = prepareShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
 
-        int programId = gl.glCreateProgram();
-        gl.glAttachShader(programId, vertexShaderId);
-        gl.glAttachShader(programId, fragmentShaderId);
-        gl.glLinkProgram(programId);
+        int programId = glCreateProgram();
+        glAttachShader(programId, vertexShaderId);
+        glAttachShader(programId, fragmentShaderId);
+        glLinkProgram(programId);
         return programId;
     }
 
-    public static int prepareShader(GLProxy gl, int type, String shaderCode) {
-        int shaderId = gl.glCreateShader(type);
+    public static int prepareShader(int type, String shaderCode) {
+        int shaderId = glCreateShader(type);
 
-        gl.glShaderSource(shaderId, shaderCode);
-        gl.glCompileShader(shaderId);
+        glShaderSource(shaderId, shaderCode);
+        glCompileShader(shaderId);
 
         return shaderId;
-    }
-
-    public static int prepareStaticBuffer(GLProxy gl, float[] data, int[] itmp1) {
-        gl.glGenBuffers(1, itmp1, 0);
-        int id = itmp1[0];
-
-        gl.glBindBuffer(GL_ARRAY_BUFFER, id);
-        gl.glBufferData(GL_ARRAY_BUFFER, data.length * 4, FloatBuffer.wrap(data), GL_STATIC_DRAW);
-
-        return id;
     }
 
     public static byte[] download(String url) throws InterruptedIOException {
@@ -186,16 +175,5 @@ public class Common {
                         + first[j + 12] * second[i + 3];
             }
         }
-    }
-
-    public static boolean uniformTest4f(float[] data, float d0, float d1, float d2, float d3) {
-        if (data[0] != d0 || data[1] != d1 || data[2] != d2 || data[3] != d3) {
-            data[0] = d0;
-            data[1] = d1;
-            data[2] = d2;
-            data[3] = d3;
-            return false;
-        }
-        return true;
     }
 }
