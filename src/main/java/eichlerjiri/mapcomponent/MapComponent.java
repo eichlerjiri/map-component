@@ -31,10 +31,10 @@ public abstract class MapComponent extends RelativeLayout {
     private final GestureDetector gestureDetector;
     private final LinearLayout centerButtonLayout;
 
-    private float lastX1 = Float.MIN_VALUE;
-    private float lastY1 = Float.MIN_VALUE;
-    private float lastX2 = Float.MIN_VALUE;
-    private float lastY2 = Float.MIN_VALUE;
+    private float lastX1 = Float.NEGATIVE_INFINITY;
+    private float lastY1 = Float.NEGATIVE_INFINITY;
+    private float lastX2 = Float.NEGATIVE_INFINITY;
+    private float lastY2 = Float.NEGATIVE_INFINITY;
 
     public boolean centered = true;
 
@@ -176,11 +176,11 @@ public abstract class MapComponent extends RelativeLayout {
             int id = event.getPointerId(event.getActionIndex());
 
             if (id == 0) {
-                lastX1 = Float.MIN_VALUE;
-                lastY1 = Float.MIN_VALUE;
+                lastX1 = Float.NEGATIVE_INFINITY;
+                lastY1 = Float.NEGATIVE_INFINITY;
             } else if (id == 1) {
-                lastX2 = Float.MIN_VALUE;
-                lastY2 = Float.MIN_VALUE;
+                lastX2 = Float.NEGATIVE_INFINITY;
+                lastY2 = Float.NEGATIVE_INFINITY;
             }
         } else if (action == MotionEvent.ACTION_MOVE) {
             float preX1 = lastX1;
@@ -195,7 +195,7 @@ public abstract class MapComponent extends RelativeLayout {
                 float y = event.getY(i);
 
                 if (id == 0) {
-                    if (lastX2 == Float.MIN_VALUE) {
+                    if (lastX2 == Float.NEGATIVE_INFINITY) {
                         stopCentering();
                         moveSingle(lastX1, lastY1, x, y);
                         commit();
@@ -209,7 +209,7 @@ public abstract class MapComponent extends RelativeLayout {
                 }
             }
 
-            if (lastX1 != Float.MIN_VALUE && lastX2 != Float.MIN_VALUE) {
+            if (lastX1 != Float.NEGATIVE_INFINITY && lastX2 != Float.NEGATIVE_INFINITY) {
                 stopCentering();
                 moveDouble(preX1, preY1, preX2, preY2, lastX1, lastY1, lastX2, lastY2);
                 commit();

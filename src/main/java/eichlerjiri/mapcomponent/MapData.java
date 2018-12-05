@@ -7,13 +7,13 @@ public class MapData {
     public float zoom;
     public float azimuth;
 
-    public double currentPositionX = Double.MIN_VALUE;
-    public double currentPositionY = Double.MIN_VALUE;
-    public float currentPositionAzimuth = Float.MIN_VALUE;
-    public double startPositionX = Double.MIN_VALUE;
-    public double startPositionY = Double.MIN_VALUE;
-    public double endPositionX = Double.MIN_VALUE;
-    public double endPositionY = Double.MIN_VALUE;
+    public double currentPositionX = Double.NEGATIVE_INFINITY;
+    public double currentPositionY = Double.NEGATIVE_INFINITY;
+    public float currentPositionAzimuth = Float.NEGATIVE_INFINITY;
+    public double startPositionX = Double.NEGATIVE_INFINITY;
+    public double startPositionY = Double.NEGATIVE_INFINITY;
+    public double endPositionX = Double.NEGATIVE_INFINITY;
+    public double endPositionY = Double.NEGATIVE_INFINITY;
     public double[] path;
     public int pathOffset;
     public int pathLength;

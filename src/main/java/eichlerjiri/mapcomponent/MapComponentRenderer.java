@@ -29,7 +29,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     private int h;
 
     // zoom-related values
-    private float zoom = Float.MIN_VALUE;
+    private float zoom = Float.NEGATIVE_INFINITY;
     private int mapZoom;
     private int tiles;
     private double tilesReversed;
@@ -43,7 +43,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     private final float[] mapMatrix = new float[16];
 
     // azimuth related values
-    private float azimuth = Float.MIN_VALUE;
+    private float azimuth = Float.NEGATIVE_INFINITY;
     private float azimuthSin;
     private float azimuthCos;
     private final float[] rotateMatrix = new float[16];
@@ -112,13 +112,13 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         } else {
             drawing.noRenderPath();
         }
-        if (d.startPositionX != Double.MIN_VALUE) {
+        if (d.startPositionX != Double.NEGATIVE_INFINITY) {
             drawPosition(d.startPositionX, d.startPositionY, 0, 1, 0, 1);
         }
-        if (d.endPositionX != Double.MIN_VALUE) {
+        if (d.endPositionX != Double.NEGATIVE_INFINITY) {
             drawPosition(d.endPositionX, d.endPositionY, 1, 0, 0, 1);
         }
-        if (d.currentPositionX != Double.MIN_VALUE) {
+        if (d.currentPositionX != Double.NEGATIVE_INFINITY) {
             drawCurrentPosition(d.currentPositionX, d.currentPositionY, d.currentPositionAzimuth);
         }
     }
@@ -228,7 +228,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         preparePoint(x, y);
         Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, ftmpX, ftmpY, 0);
 
-        if (positionAzimuth != Float.MIN_VALUE) {
+        if (positionAzimuth != Float.NEGATIVE_INFINITY) {
             Matrix.rotateM(tmpMatrix, 0, azimuth + positionAzimuth, 0, 0, 1);
 
             drawing.renderCurrentPosition(tmpMatrix);
@@ -249,14 +249,14 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         float ptx = ftmpX;
         float pty = ftmpY;
 
-        float ptx11 = Float.MIN_VALUE;
-        float pty11 = Float.MIN_VALUE;
-        float ptx12 = Float.MIN_VALUE;
-        float pty12 = Float.MIN_VALUE;
-        float ptx21 = Float.MIN_VALUE;
-        float pty21 = Float.MIN_VALUE;
-        float ptx22 = Float.MIN_VALUE;
-        float pty22 = Float.MIN_VALUE;
+        float ptx11 = Float.NEGATIVE_INFINITY;
+        float pty11 = Float.NEGATIVE_INFINITY;
+        float ptx12 = Float.NEGATIVE_INFINITY;
+        float pty12 = Float.NEGATIVE_INFINITY;
+        float ptx21 = Float.NEGATIVE_INFINITY;
+        float pty21 = Float.NEGATIVE_INFINITY;
+        float ptx22 = Float.NEGATIVE_INFINITY;
+        float pty22 = Float.NEGATIVE_INFINITY;
 
         for (int i = 2; i < length; i += 2) {
             preparePoint(path[offset + i], path[offset + i + 1]);
@@ -279,7 +279,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             float tx22 = tx - vy;
             float ty22 = ty + vx;
 
-            if (ptx11 != Float.MIN_VALUE) {
+            if (ptx11 != Float.NEGATIVE_INFINITY) {
                 fltmp.add(ptx11, pty11, ptx12, pty12, ptx21, pty21, ptx12, pty12, ptx21, pty21, ptx22, pty22);
                 fltmp.add(ptx21, pty21, tx11, ty11, ptx, pty, ptx22, pty22, tx12, ty12, ptx, pty);
             }
