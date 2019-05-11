@@ -38,11 +38,11 @@ public abstract class MapComponent extends RelativeLayout {
 
     public boolean centered = true;
 
-    public MapComponent(Context context, ArrayList<String> mapUrls) {
+    protected MapComponent(Context context, ArrayList<String> mapUrls) {
         super(context);
         glView = new GLSurfaceView(context);
         tileLoadPool = new TileLoadPool(context, this);
-        tileDownloadPool = new TileDownloadPool(this, mapUrls);
+        tileDownloadPool = new TileDownloadPool(mapUrls);
 
         glView.setZOrderOnTop(true); // no black flash on load
         glView.setZOrderMediaOverlay(true);
@@ -57,7 +57,7 @@ public abstract class MapComponent extends RelativeLayout {
         int size = Math.round(40 * spSize);
         int margin = Math.round(10 * spSize);
 
-        LayoutParams params = new LayoutParams(size, size);
+        RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(size, size);
         params.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
         params.setMargins(margin, margin, margin, margin);
         centerButtonLayout.setLayoutParams(params);
@@ -67,7 +67,7 @@ public abstract class MapComponent extends RelativeLayout {
         glView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
         addView(glView);
 
-        gestureDetector = new GestureDetector(new GestureDetector.SimpleOnGestureListener() {
+        gestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onDoubleTap(MotionEvent e) {
                 zoomIn(e.getX(), e.getY());
@@ -76,7 +76,7 @@ public abstract class MapComponent extends RelativeLayout {
             }
         });
 
-        centerButton.setOnClickListener(new OnClickListener() {
+        centerButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 startCentering();
@@ -96,7 +96,7 @@ public abstract class MapComponent extends RelativeLayout {
         return ret;
     }
 
-    public void restoreInstanceState(final Bundle bundle) {
+    public void restoreInstanceState(Bundle bundle) {
         d.posX = bundle.getDouble("posX");
         d.posY = bundle.getDouble("posY");
         d.zoom = bundle.getFloat("zoom");
@@ -301,7 +301,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     public void moveDouble(float preX1, float preY1, float preX2, float preY2,
-                           float postX1, float postY1, float postX2, float postY2) {
+            float postX1, float postY1, float postX2, float postY2) {
         double preMercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
 
         float preDist = computeDistance(preX1, preY1, preX2, preY2);

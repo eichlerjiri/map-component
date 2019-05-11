@@ -9,7 +9,7 @@ public abstract class TileRunnable implements Runnable, Comparable<TileRunnable>
     public final RequestedTile tile;
     public volatile int priority;
 
-    public TileRunnable(MapComponent mc, RequestedTile tile) {
+    protected TileRunnable(MapComponent mc, RequestedTile tile) {
         this.mc = mc;
         this.tile = tile;
         priority = tile.priority;

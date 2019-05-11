@@ -5,10 +5,6 @@ public class DoubleArrayList {
     public double[] data = new double[8];
     public int size;
 
-    public void clear() {
-        size = 0;
-    }
-
     public void ensureCapacity(int extra) {
         int newCapacity = data.length * 2;
         while (newCapacity < size + extra) {

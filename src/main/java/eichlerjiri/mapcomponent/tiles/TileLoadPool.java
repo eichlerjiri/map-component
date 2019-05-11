@@ -10,8 +10,9 @@ import java.util.concurrent.TimeUnit;
 
 import eichlerjiri.mapcomponent.MapComponent;
 import eichlerjiri.mapcomponent.utils.LoadedTile;
-import eichlerjiri.mapcomponent.utils.TileKeyHashMap;
 import eichlerjiri.mapcomponent.utils.RequestedTile;
+import eichlerjiri.mapcomponent.utils.TileKeyEntry;
+import eichlerjiri.mapcomponent.utils.TileKeyHashMap;
 
 public class TileLoadPool extends ThreadPoolExecutor {
 
@@ -65,7 +66,7 @@ public class TileLoadPool extends ThreadPoolExecutor {
     }
 
     public void cancelUnused(int tick) {
-        for (TileKeyHashMap.Entry<RequestedTile> entry : requestedTiles.entries) {
+        for (TileKeyEntry<RequestedTile> entry : requestedTiles.entries) {
             while (entry != null) {
                 RequestedTile tile = entry.value;
                 if (tile.tick != tick) {

@@ -7,9 +7,9 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 import eichlerjiri.mapcomponent.utils.CachedTile;
-import eichlerjiri.mapcomponent.utils.Common;
 import eichlerjiri.mapcomponent.utils.FloatArrayList;
 import eichlerjiri.mapcomponent.utils.LoadedTile;
+import eichlerjiri.mapcomponent.utils.TileKeyEntry;
 import eichlerjiri.mapcomponent.utils.TileKeyHashMap;
 
 import static eichlerjiri.mapcomponent.utils.Common.*;
@@ -69,7 +69,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onSurfaceChanged(GL10 gl10, int width, int height) {
-        drawing.surfaceChanged(width, height);
+        Drawing.surfaceChanged(width, height);
 
         w = width;
         h = height;
@@ -144,7 +144,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             preparePoint(tileXview * tilesReversed, tileY * tilesReversed);
             Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, ftmpX, ftmpY, 0);
             Matrix.scaleM(tmpMatrix, 0, scale, scale, 1);
-            Common.multiplyMM(tmpMatrix2, tmpMatrix, rotateMatrix);
+            multiplyMM(tmpMatrix2, tmpMatrix, rotateMatrix);
 
             drawing.renderTile(tmpMatrix2, texture, 1, 1, 0, 0);
             return;
@@ -160,7 +160,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
                 preparePoint(tileXview * tilesReversed, tileY * tilesReversed);
                 Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, ftmpX, ftmpY, 0);
                 Matrix.scaleM(tmpMatrix, 0, scale, scale, 1);
-                Common.multiplyMM(tmpMatrix2, tmpMatrix, rotateMatrix);
+                multiplyMM(tmpMatrix2, tmpMatrix, rotateMatrix);
 
                 int zoomDiffTiles = 1 << (mapZoom - testZoom);
                 float scaleTile = 1.0f / zoomDiffTiles;
@@ -192,7 +192,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
                     preparePoint(curTileX * tilesReversed * 0.5f, curTileY * tilesReversed * 0.5f);
                     Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, ftmpX, ftmpY, 0);
                     Matrix.scaleM(tmpMatrix, 0, scale * 0.5f, scale * 0.5f, 1);
-                    Common.multiplyMM(tmpMatrix2, tmpMatrix, rotateMatrix);
+                    multiplyMM(tmpMatrix2, tmpMatrix, rotateMatrix);
 
                     drawing.renderTile(tmpMatrix2, texture, 1, 1, 0, 0);
                 }
@@ -204,7 +204,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         preparePoint(tileXview * tilesReversed, tileY * tilesReversed);
         Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, ftmpX, ftmpY, 0);
         Matrix.scaleM(tmpMatrix, 0, scale, scale, 1);
-        Common.multiplyMM(tmpMatrix2, tmpMatrix, rotateMatrix);
+        multiplyMM(tmpMatrix2, tmpMatrix, rotateMatrix);
 
         drawing.renderEmptyTile(tmpMatrix2);
     }
@@ -301,7 +301,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
         drawing.renderPath(mapMatrix, fltmp);
 
-        fltmp.clear();
+        fltmp.size = 0;
     }
 
     private void preparePoint(double mercatorX, double mercatorY) {
@@ -323,7 +323,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
     }
 
     private void removeUnused() {
-        for (TileKeyHashMap.Entry<CachedTile> entry : tileCache.entries) {
+        for (TileKeyEntry<CachedTile> entry : tileCache.entries) {
             while (entry != null) {
                 CachedTile item = entry.value;
                 if (item.tick != tick) {

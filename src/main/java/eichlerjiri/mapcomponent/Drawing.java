@@ -37,7 +37,7 @@ public class Drawing {
         this.spSize = spSize;
     }
 
-    public void surfaceChanged(int width, int height) {
+    public static void surfaceChanged(int width, int height) {
         glViewport(0, 0, width, height);
     }
 

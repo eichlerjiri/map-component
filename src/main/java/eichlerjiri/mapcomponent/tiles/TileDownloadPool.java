@@ -6,20 +6,16 @@ import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import eichlerjiri.mapcomponent.MapComponent;
-
 public class TileDownloadPool extends ThreadPoolExecutor {
 
-    public final MapComponent mc;
     private final ArrayList<String> mapUrls;
     private final ThreadLocal<String> serverUrl = new ThreadLocal<>();
 
-    public TileDownloadPool(MapComponent mc, ArrayList<String> mapUrls) {
+    public TileDownloadPool(ArrayList<String> mapUrls) {
         super(10, 10, 10L, TimeUnit.SECONDS, new PriorityBlockingQueue<Runnable>(),
                 new ThreadPoolExecutor.DiscardPolicy());
         allowCoreThreadTimeOut(true);
 
-        this.mc = mc;
         this.mapUrls = mapUrls;
     }
 

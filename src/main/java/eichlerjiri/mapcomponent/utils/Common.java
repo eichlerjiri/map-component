@@ -9,6 +9,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -111,9 +112,7 @@ public class Common {
             } finally {
                 closeStream(fis);
             }
-        } catch (InterruptedIOException e) {
-            throw e;
-        } catch (IOException e) {
+        } catch (FileNotFoundException e) {
             Log.e("IOUtils", "Cannot read file: " + file, e);
             return null;
         }
