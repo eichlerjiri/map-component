@@ -10,35 +10,35 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 
-import java.util.ArrayList;
-
 import eichlerjiri.mapcomponent.tiles.TileDownloadPool;
 import eichlerjiri.mapcomponent.tiles.TileLoadPool;
+import eichlerjiri.mapcomponent.utils.ObjectList;
 
 import static eichlerjiri.mapcomponent.utils.Common.*;
+import static java.lang.Math.*;
 
 public abstract class MapComponent extends RelativeLayout {
 
     public final GLSurfaceView glView;
     public final MapComponentRenderer renderer = new MapComponentRenderer(this);
 
-    private final MapData d = new MapData();
+    public final MapData d = new MapData();
     public volatile MapData dCommited = new MapData();
 
     public final TileLoadPool tileLoadPool;
     public final TileDownloadPool tileDownloadPool;
 
-    private final GestureDetector gestureDetector;
-    private final LinearLayout centerButtonLayout;
+    public final GestureDetector gestureDetector;
+    public final LinearLayout centerButtonLayout;
 
-    private float lastX1 = Float.NEGATIVE_INFINITY;
-    private float lastY1 = Float.NEGATIVE_INFINITY;
-    private float lastX2 = Float.NEGATIVE_INFINITY;
-    private float lastY2 = Float.NEGATIVE_INFINITY;
+    public float lastX1 = Float.NEGATIVE_INFINITY;
+    public float lastY1 = Float.NEGATIVE_INFINITY;
+    public float lastX2 = Float.NEGATIVE_INFINITY;
+    public float lastY2 = Float.NEGATIVE_INFINITY;
 
     public boolean centered = true;
 
-    protected MapComponent(Context context, ArrayList<String> mapUrls) {
+    public MapComponent(Context context, ObjectList<String> mapUrls) {
         super(context);
         glView = new GLSurfaceView(context);
         tileLoadPool = new TileLoadPool(context, this);
@@ -54,8 +54,8 @@ public abstract class MapComponent extends RelativeLayout {
         centerButtonLayout.setBackgroundColor(0x99ffffff);
 
         float spSize = spSize(context);
-        int size = Math.round(40 * spSize);
-        int margin = Math.round(10 * spSize);
+        int size = round(40 * spSize);
+        int margin = round(10 * spSize);
 
         RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(size, size);
         params.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
@@ -275,11 +275,11 @@ public abstract class MapComponent extends RelativeLayout {
             height -= pixPadding;
         }
 
-        double log2 = 1 / Math.log(2);
-        double zoomX = Math.log(width / (renderer.tileSize * diffX)) * log2;
-        double zoomY = Math.log(height / (renderer.tileSize * diffY)) * log2;
+        double log2 = 1 / log(2);
+        double zoomX = log(width / (renderer.tileSize * diffX)) * log2;
+        double zoomY = log(height / (renderer.tileSize * diffY)) * log2;
 
-        float zoom = (float) Math.min(zoomX, zoomY);
+        float zoom = (float) min(zoomX, zoomY);
         if (zoom != zoom || zoom == Float.NEGATIVE_INFINITY || zoom == Float.POSITIVE_INFINITY) {
             zoom = defaultZoom;
         }
@@ -293,17 +293,15 @@ public abstract class MapComponent extends RelativeLayout {
         double x = (preX - postX) * mercatorPixelSize;
         double y = (preY - postY) * mercatorPixelSize;
 
-        double rad = Math.toRadians(d.azimuth);
-        double azimuthCos = Math.cos(rad);
-        double azimuthSin = Math.sin(rad);
+        double rad = toRadians(d.azimuth);
+        double azimuthCos = cos(rad);
+        double azimuthSin = sin(rad);
 
         setPosition(d.posX + x * azimuthCos + y * azimuthSin, d.posY + y * azimuthCos - x * azimuthSin);
     }
 
     public void moveDouble(float preX1, float preY1, float preX2, float preY2,
             float postX1, float postY1, float postX2, float postY2) {
-        double preMercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
-
         float preDist = computeDistance(preX1, preY1, preX2, preY2);
         float postDist = computeDistance(postX1, postY1, postX2, postY2);
         float diff = postDist / preDist;
@@ -311,7 +309,9 @@ public abstract class MapComponent extends RelativeLayout {
             return;
         }
 
-        setZoom(d.zoom + (float) (Math.log(diff) / Math.log(2)));
+        double preMercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
+
+        setZoom(d.zoom + (float) (log(diff) / log(2)));
 
         double mercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
 
@@ -326,16 +326,16 @@ public abstract class MapComponent extends RelativeLayout {
         postX2 -= surfaceCenterX;
         postY2 -= surfaceCenterY;
 
-        double rad = Math.toRadians(d.azimuth);
-        double azimuthCos = Math.cos(rad);
-        double azimuthSin = Math.sin(rad);
+        double rad = toRadians(d.azimuth);
+        double azimuthCos = cos(rad);
+        double azimuthSin = sin(rad);
 
         double posX1 = d.posX + (preX1 * azimuthCos + preY1 * azimuthSin) * preMercatorPixelSize;
         double posY1 = d.posY + (preY1 * azimuthCos - preX1 * azimuthSin) * preMercatorPixelSize;
 
-        double lastAngle = Math.atan2(preX2 - preX1, preY2 - preY1);
-        double angle = Math.atan2(postX2 - postX1, postY2 - postY1);
-        setAzimuth(d.azimuth + (float) Math.toDegrees(lastAngle - angle));
+        double lastAngle = atan2(preX2 - preX1, preY2 - preY1);
+        double angle = atan2(postX2 - postX1, postY2 - postY1);
+        setAzimuth(d.azimuth + (float) toDegrees(lastAngle - angle));
 
         double posX2 = posX1 - (postX1 * azimuthCos + postY1 * azimuthSin) * mercatorPixelSize;
         double posY2 = posY1 - (postY1 * azimuthCos - postX1 * azimuthSin) * mercatorPixelSize;
@@ -345,16 +345,16 @@ public abstract class MapComponent extends RelativeLayout {
     public void zoomIn(float x, float y) {
         double preMercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
 
-        setZoom(Math.round(d.zoom + 1));
+        setZoom(round(d.zoom + 1));
 
         double mercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
 
         x -= glView.getWidth() * 0.5f;
         y -= glView.getHeight() * 0.5f;
 
-        double rad = Math.toRadians(d.azimuth);
-        double azimuthCos = Math.cos(rad);
-        double azimuthSin = Math.sin(rad);
+        double rad = toRadians(d.azimuth);
+        double azimuthCos = cos(rad);
+        double azimuthSin = sin(rad);
 
         double px = d.posX + (x * azimuthCos + y * azimuthSin) * (preMercatorPixelSize - mercatorPixelSize);
         double py = d.posY + (y * azimuthCos - x * azimuthSin) * (preMercatorPixelSize - mercatorPixelSize);

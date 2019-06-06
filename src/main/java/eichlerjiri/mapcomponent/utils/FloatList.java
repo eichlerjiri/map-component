@@ -1,6 +1,6 @@
 package eichlerjiri.mapcomponent.utils;
 
-public class FloatArrayList {
+public class FloatList {
 
     public float[] data = new float[8];
     public int size;

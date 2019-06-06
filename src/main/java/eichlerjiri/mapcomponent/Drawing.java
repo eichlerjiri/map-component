@@ -5,33 +5,33 @@ import java.nio.FloatBuffer;
 
 import eichlerjiri.mapcomponent.shaders.ColorShader;
 import eichlerjiri.mapcomponent.shaders.MapShader;
-import eichlerjiri.mapcomponent.utils.FloatArrayList;
+import eichlerjiri.mapcomponent.utils.FloatList;
 
 import static android.opengl.GLES20.*;
 
 public class Drawing {
 
-    private final float spSize;
-    private final int[] itmp = new int[1];
+    public final float spSize;
+    public final int[] itmp = new int[1];
 
-    private MapShader mapShader;
-    private int mapVbuffer;
-    private int mapVbufferCount;
+    public MapShader mapShader;
+    public int mapVbuffer;
+    public int mapVbufferCount;
 
-    private ColorShader colorShader;
-    private int currentPositionVbuffer;
-    private int currentPositionVbufferCount;
-    private int nodirCurrentPositionVbuffer;
-    private int nodirCurrentPositionVbufferCount;
-    private int positionVbuffer;
-    private int positionVbufferCount;
-    private int pathVbuffer;
-    private FloatBuffer pathVtmp;
+    public ColorShader colorShader;
+    public int currentPositionVbuffer;
+    public int currentPositionVbufferCount;
+    public int nodirCurrentPositionVbuffer;
+    public int nodirCurrentPositionVbufferCount;
+    public int positionVbuffer;
+    public int positionVbufferCount;
+    public int pathVbuffer;
+    public FloatBuffer pathVtmp;
 
-    private int boundBuffer;
-    private int boundTexture;
-    private int boundProgram;
-    private boolean attribOk;
+    public int boundBuffer;
+    public int boundTexture;
+    public int boundProgram;
+    public boolean attribOk;
 
     public Drawing(float spSize) {
         this.spSize = spSize;
@@ -128,7 +128,7 @@ public class Drawing {
         renderColor(pvm, positionVbuffer, positionVbufferCount, GL_TRIANGLES, r, g, b, a);
     }
 
-    public void renderPath(float[] pvm, FloatArrayList data) {
+    public void renderPath(float[] pvm, FloatList data) {
         if (pathVbuffer == 0) {
             glGenBuffers(1, itmp, 0);
             pathVbuffer = itmp[0];
@@ -153,7 +153,7 @@ public class Drawing {
         }
     }
 
-    private void renderColor(float[] pvm, int buffer, int bufferCount, int type, float r, float g, float b, float a) {
+    public void renderColor(float[] pvm, int buffer, int bufferCount, int type, float r, float g, float b, float a) {
         if (colorShader == null) {
             colorShader = new ColorShader();
         }
@@ -179,20 +179,20 @@ public class Drawing {
         glDrawArrays(type, 0, bufferCount);
     }
 
-    private void prepareMapBuffer() {
+    public void prepareMapBuffer() {
         float[] mapBufferData = new float[]{0, 0, 0, 1, 1, 1, 1, 0};
         mapVbuffer = prepareStaticBuffer(mapBufferData);
         mapVbufferCount = mapBufferData.length / 2;
     }
 
-    private int prepareStaticBuffer(float[] data) {
+    public int prepareStaticBuffer(float[] data) {
         glGenBuffers(1, itmp, 0);
         bindBuffer(itmp[0]);
         glBufferData(GL_ARRAY_BUFFER, data.length * 4, FloatBuffer.wrap(data), GL_STATIC_DRAW);
         return itmp[0];
     }
 
-    private void bindBuffer(int buffer) {
+    public void bindBuffer(int buffer) {
         boundBuffer = buffer;
         attribOk = false;
         glBindBuffer(GL_ARRAY_BUFFER, buffer);

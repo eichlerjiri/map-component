@@ -11,7 +11,7 @@ import static eichlerjiri.mapcomponent.utils.Common.*;
 
 public class TileLoaderDownloaded extends TileRunnable {
 
-    private final byte[] data;
+    public final byte[] data;
 
     public TileLoaderDownloaded(MapComponent mc, RequestedTile tile, byte[] data) {
         super(mc, tile);

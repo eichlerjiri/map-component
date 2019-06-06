@@ -7,53 +7,54 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 import eichlerjiri.mapcomponent.utils.CachedTile;
-import eichlerjiri.mapcomponent.utils.FloatArrayList;
+import eichlerjiri.mapcomponent.utils.FloatList;
 import eichlerjiri.mapcomponent.utils.LoadedTile;
 import eichlerjiri.mapcomponent.utils.TileKeyEntry;
 import eichlerjiri.mapcomponent.utils.TileKeyHashMap;
 
 import static eichlerjiri.mapcomponent.utils.Common.*;
+import static java.lang.Math.*;
 
 public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
-    private final MapComponent mapComponent;
-    private final float spSize;
+    public final MapComponent mapComponent;
+    public final float spSize;
     public final float tileSize;
 
-    private final TileKeyHashMap<CachedTile> tileCache = new TileKeyHashMap<>();
-    private Drawing drawing;
-    private MapData d;
-    private int tick;
+    public final TileKeyHashMap<CachedTile> tileCache = new TileKeyHashMap<>();
+    public Drawing drawing;
+    public MapData d;
+    public int tick;
 
-    private int w;
-    private int h;
+    public int w;
+    public int h;
 
     // zoom-related values
-    private float zoom = Float.NEGATIVE_INFINITY;
-    private int mapZoom;
-    private int tiles;
-    private double tilesReversed;
-    private double mercatorPixels;
-    private float scale;
+    public float zoom = Float.NEGATIVE_INFINITY;
+    public int mapZoom;
+    public int tiles;
+    public double tilesReversed;
+    public double mercatorPixels;
+    public float scale;
 
     // screen-size related values
-    private float surfaceCenterX;
-    private float surfaceCenterY;
-    private int searchDist;
-    private final float[] mapMatrix = new float[16];
+    public float surfaceCenterX;
+    public float surfaceCenterY;
+    public int searchDist;
+    public final float[] mapMatrix = new float[16];
 
     // azimuth related values
-    private float azimuth = Float.NEGATIVE_INFINITY;
-    private float azimuthSin;
-    private float azimuthCos;
-    private final float[] rotateMatrix = new float[16];
+    public float azimuth = Float.NEGATIVE_INFINITY;
+    public float azimuthSin;
+    public float azimuthCos;
+    public final float[] rotateMatrix = new float[16];
 
     // tmps
-    private final FloatArrayList fltmp = new FloatArrayList();
-    private final float[] tmpMatrix = new float[16];
-    private final float[] tmpMatrix2 = new float[16];
-    private float ftmpX;
-    private float ftmpY;
+    public final FloatList fltmp = new FloatList();
+    public final float[] tmpMatrix = new float[16];
+    public final float[] tmpMatrix2 = new float[16];
+    public float ftmpX;
+    public float ftmpY;
 
     public MapComponentRenderer(MapComponent mapComponent) {
         this.mapComponent = mapComponent;
@@ -101,7 +102,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         mapComponent.tileLoadPool.processLoaded();
         for (int i = centerTileX - searchDist; i <= centerTileX + searchDist; i++) {
             for (int j = centerTileY - searchDist; j <= centerTileY + searchDist; j++) {
-                drawTile(i, j, Math.abs(i - centerTileX) + Math.abs(j - centerTileY));
+                drawTile(i, j, abs(i - centerTileX) + abs(j - centerTileY));
             }
         }
         mapComponent.tileLoadPool.cancelUnused(tick);
@@ -123,7 +124,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         }
     }
 
-    private void drawTile(int tileXview, int tileY, int toCenter) {
+    public void drawTile(int tileXview, int tileY, int toCenter) {
         int tileX = tileXview;
         while (tileX < 0) {
             tileX += tiles;
@@ -200,7 +201,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         }
     }
 
-    private void drawTileEmpty(int tileXview, int tileY) {
+    public void drawTileEmpty(int tileXview, int tileY) {
         preparePoint(tileXview * tilesReversed, tileY * tilesReversed);
         Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, ftmpX, ftmpY, 0);
         Matrix.scaleM(tmpMatrix, 0, scale, scale, 1);
@@ -209,7 +210,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         drawing.renderEmptyTile(tmpMatrix2);
     }
 
-    private int getTexture(int z, int x, int y, int priority) {
+    public int getTexture(int z, int x, int y, int priority) {
         if (z < 0 || z > 19) {
             return 0;
         }
@@ -224,7 +225,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         return cacheItem.textureId;
     }
 
-    private void drawCurrentPosition(double x, double y, float positionAzimuth) {
+    public void drawCurrentPosition(double x, double y, float positionAzimuth) {
         preparePoint(x, y);
         Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, ftmpX, ftmpY, 0);
 
@@ -237,14 +238,14 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         }
     }
 
-    private void drawPosition(double positionX, double positionY, float r, float g, float b, float a) {
+    public void drawPosition(double positionX, double positionY, float r, float g, float b, float a) {
         preparePoint(positionX, positionY);
         Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, ftmpX, ftmpY, 0);
 
         drawing.renderPosition(tmpMatrix, r, g, b, a);
     }
 
-    private void drawPath(double[] path, int offset, int length) {
+    public void drawPath(double[] path, int offset, int length) {
         preparePoint(path[offset], path[offset + 1]);
         float ptx = ftmpX;
         float pty = ftmpY;
@@ -266,7 +267,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
             float vx = tx - ptx;
             float vy = ty - pty;
 
-            float norm = 1.5f * spSize / (float) Math.sqrt(vx * vx + vy * vy);
+            float norm = 1.5f * spSize / (float) sqrt(vx * vx + vy * vy);
             vx *= norm;
             vy *= norm;
 
@@ -304,7 +305,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         fltmp.size = 0;
     }
 
-    private void preparePoint(double mercatorX, double mercatorY) {
+    public void preparePoint(double mercatorX, double mercatorY) {
         float x = (float) ((mercatorX - d.posX) * mercatorPixels);
         float y = (float) ((mercatorY - d.posY) * mercatorPixels);
 
@@ -322,8 +323,9 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         tileCache.put(loadedTile, new CachedTile(textureId, tick));
     }
 
-    private void removeUnused() {
-        for (TileKeyEntry<CachedTile> entry : tileCache.entries) {
+    public void removeUnused() {
+        for (int i = 0; i < tileCache.entries.length; i++) {
+            TileKeyEntry<CachedTile> entry = tileCache.entries[i];
             while (entry != null) {
                 CachedTile item = entry.value;
                 if (item.tick != tick) {
@@ -337,11 +339,11 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         }
     }
 
-    private void refreshScreenSizeValues() {
+    public void refreshScreenSizeValues() {
         surfaceCenterX = w * 0.5f;
         surfaceCenterY = h * 0.5f;
 
-        int tilesNecessaryBase = (int) (Math.sqrt(w * w + h * h) / tileSize);
+        int tilesNecessaryBase = (int) (sqrt(w * w + h * h) / tileSize);
         searchDist = 1 + tilesNecessaryBase / 2;
 
         if (w != 0 && h != 0) {
@@ -351,21 +353,21 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
         }
     }
 
-    private void refreshZoomValues() {
+    public void refreshZoomValues() {
         zoom = d.zoom;
         mapZoom = (int) zoom;
         tiles = 1 << mapZoom;
         tilesReversed = 1 / (double) tiles;
-        mercatorPixels = tileSize * Math.pow(2, zoom);
+        mercatorPixels = tileSize * pow(2, zoom);
         scale = (float) (mercatorPixels * tilesReversed);
     }
 
-    private void refreshAzimuthValues() {
+    public void refreshAzimuthValues() {
         azimuth = d.azimuth;
 
-        double rad = Math.toRadians(azimuth);
-        azimuthCos = (float) Math.cos(rad);
-        azimuthSin = (float) Math.sin(rad);
+        double rad = toRadians(azimuth);
+        azimuthCos = (float) cos(rad);
+        azimuthSin = (float) sin(rad);
 
         Matrix.setRotateM(rotateMatrix, 0, azimuth, 0, 0, 1);
     }

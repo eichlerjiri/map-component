@@ -1,6 +1,12 @@
 package eichlerjiri.mapcomponent.utils;
 
-public class DoubleArrayList {
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
+
+public class DoubleList {
 
     public double[] data = new double[8];
     public int size;

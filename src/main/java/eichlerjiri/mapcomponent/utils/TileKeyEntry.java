@@ -1,6 +1,7 @@
 package eichlerjiri.mapcomponent.utils;
 
 public class TileKeyEntry<T> extends TileKey {
+
     public TileKeyEntry<T> next;
     public T value;
 

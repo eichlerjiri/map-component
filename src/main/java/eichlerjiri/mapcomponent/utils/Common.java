@@ -20,17 +20,18 @@ import java.net.URLConnection;
 import java.nio.ByteBuffer;
 
 import static android.opengl.GLES20.*;
+import static java.lang.Math.*;
 
 public class Common {
 
     public static double mercatorPixelSize(float tileSize, float zoom) {
-        return 1 / (tileSize * Math.pow(2, zoom));
+        return 1 / (tileSize * pow(2, zoom));
     }
 
     public static float computeDistance(float x1, float y1, float x2, float y2) {
         float xDiff = x1 - x2;
         float yDiff = y1 - y2;
-        return (float) Math.sqrt(xDiff * xDiff + yDiff * yDiff);
+        return (float) sqrt(xDiff * xDiff + yDiff * yDiff);
     }
 
     public static float spSize(Context context) {
@@ -48,7 +49,7 @@ public class Common {
         }
 
         if (bitmap.getConfig() != Bitmap.Config.ARGB_8888) {
-            Log.w("TileLoadPool", "Converting bitmap");
+            Log.w("Common", "Converting bitmap");
             bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
         }
 
@@ -83,6 +84,8 @@ public class Common {
         URLConnection conn = null;
         try {
             conn = new URL(url).openConnection();
+            conn.setRequestProperty("User-Agent",
+                    "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:64.0) Gecko/20100101 Firefox/64.0");
             InputStream is = conn.getInputStream();
             try {
                 return readAll(is);
@@ -92,7 +95,7 @@ public class Common {
         } catch (InterruptedIOException e) {
             throw e;
         } catch (IOException e) {
-            Log.e("IOUtils", "Cannot download file: " + url, e);
+            Log.e("Common", "Cannot download file: " + url, e);
             if (conn instanceof HttpURLConnection) {
                 InputStream es = ((HttpURLConnection) conn).getErrorStream();
                 if (es != null) {
@@ -113,7 +116,7 @@ public class Common {
                 closeStream(fis);
             }
         } catch (FileNotFoundException e) {
-            Log.e("IOUtils", "Cannot read file: " + file, e);
+            Log.e("Common", "Cannot read file: " + file, e);
             return null;
         }
     }
@@ -130,7 +133,7 @@ public class Common {
         } catch (InterruptedIOException e) {
             throw e;
         } catch (IOException e) {
-            Log.e("IOUtils", "Cannot write file: " + file, e);
+            Log.e("Common", "Cannot write file: " + file, e);
             return false;
         }
     }
@@ -139,18 +142,15 @@ public class Common {
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream(is.available());
             byte[] buffer = new byte[4096];
-            while (true) {
-                int num = is.read(buffer);
-                if (num == -1) {
-                    break;
-                }
+            int num;
+            while ((num = is.read(buffer)) != -1) {
                 baos.write(buffer, 0, num);
             }
             return baos.toByteArray();
         } catch (InterruptedIOException e) {
             throw e;
         } catch (IOException e) {
-            Log.e("IOUtils", "Cannot read stream", e);
+            Log.e("Common", "Cannot read stream", e);
             return null;
         }
     }
@@ -161,7 +161,7 @@ public class Common {
         } catch (InterruptedIOException e) {
             throw e;
         } catch (IOException e) {
-            Log.e("IOUtils", "Cannot close stream", e);
+            Log.e("Common", "Cannot close stream", e);
         }
     }
 

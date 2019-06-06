@@ -18,7 +18,7 @@ public class TileLoadPool extends ThreadPoolExecutor {
 
     public final MapComponent mc;
     public final File cacheDir;
-    private final TileKeyHashMap<RequestedTile> requestedTiles = new TileKeyHashMap<>();
+    public final TileKeyHashMap<RequestedTile> requestedTiles = new TileKeyHashMap<>();
 
     public final ConcurrentLinkedQueue<RequestedTile> cancelledTiles = new ConcurrentLinkedQueue<>();
     public final ConcurrentLinkedQueue<LoadedTile> loadedTiles = new ConcurrentLinkedQueue<>();
@@ -66,7 +66,8 @@ public class TileLoadPool extends ThreadPoolExecutor {
     }
 
     public void cancelUnused(int tick) {
-        for (TileKeyEntry<RequestedTile> entry : requestedTiles.entries) {
+        for (int i = 0; i < requestedTiles.entries.length; i++) {
+            TileKeyEntry<RequestedTile> entry = requestedTiles.entries[i];
             while (entry != null) {
                 RequestedTile tile = entry.value;
                 if (tile.tick != tick) {
