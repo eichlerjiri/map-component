@@ -64,6 +64,7 @@ public class MapComponentRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onSurfaceCreated(GL10 gl10, EGLConfig config) {
+        Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
         tileCache.clear();
         drawing = new Drawing(spSize);
     }

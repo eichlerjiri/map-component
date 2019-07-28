@@ -5,6 +5,7 @@ import android.content.Context;
 import java.io.File;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -24,8 +25,14 @@ public class TileLoadPool extends ThreadPoolExecutor {
     public final ConcurrentLinkedQueue<LoadedTile> loadedTiles = new ConcurrentLinkedQueue<>();
 
     public TileLoadPool(Context c, MapComponent mc) {
-        super(1, 1, 0L, TimeUnit.SECONDS, new PriorityBlockingQueue<Runnable>(),
-                new ThreadPoolExecutor.DiscardPolicy());
+        super(1, 1, 0L, TimeUnit.SECONDS, new PriorityBlockingQueue<Runnable>(), new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable runnable) {
+                Thread t = new Thread(runnable);
+                t.setPriority(4);
+                return t;
+            }
+        }, new ThreadPoolExecutor.DiscardPolicy());
 
         this.mc = mc;
         cacheDir = c.getCacheDir();
