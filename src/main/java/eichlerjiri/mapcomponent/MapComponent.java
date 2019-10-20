@@ -10,6 +10,9 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 
+import javax.microedition.khronos.egl.EGLConfig;
+import javax.microedition.khronos.opengles.GL10;
+
 import eichlerjiri.mapcomponent.tiles.TileDownloadPool;
 import eichlerjiri.mapcomponent.tiles.TileLoadPool;
 import eichlerjiri.mapcomponent.utils.ObjectList;
@@ -20,7 +23,10 @@ import static java.lang.Math.*;
 public abstract class MapComponent extends RelativeLayout {
 
     public final GLSurfaceView glView;
-    public final MapComponentRenderer renderer = new MapComponentRenderer(this);
+    public final float spSize;
+    public final float tileSize;
+
+    public MapComponentRenderer renderer;
 
     public final MapData d = new MapData();
     public volatile MapData dCommited = new MapData();
@@ -41,6 +47,9 @@ public abstract class MapComponent extends RelativeLayout {
     public MapComponent(Context context, ObjectList<String> mapUrls) {
         super(context);
         glView = new GLSurfaceView(context);
+        spSize = spSize(context);
+        tileSize = 256 * spSize;
+
         tileLoadPool = new TileLoadPool(context, this);
         tileDownloadPool = new TileDownloadPool(mapUrls);
 
@@ -53,7 +62,6 @@ public abstract class MapComponent extends RelativeLayout {
         centerButtonLayout.addView(centerButton);
         centerButtonLayout.setBackgroundColor(0x99ffffff);
 
-        float spSize = spSize(context);
         int size = round(40 * spSize);
         int margin = round(10 * spSize);
 
@@ -63,7 +71,23 @@ public abstract class MapComponent extends RelativeLayout {
         centerButtonLayout.setLayoutParams(params);
 
         glView.setEGLContextClientVersion(2);
-        glView.setRenderer(renderer);
+        glView.setRenderer(new GLSurfaceView.Renderer() {
+            @Override
+            public void onSurfaceCreated(GL10 gl10, EGLConfig eglConfig) {
+                Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
+                renderer = new MapComponentRenderer(MapComponent.this);
+            }
+
+            @Override
+            public void onSurfaceChanged(GL10 gl10, int i, int i1) {
+                renderer.setDimensions(i, i1);
+            }
+
+            @Override
+            public void onDrawFrame(GL10 gl10) {
+                renderer.drawFrame();
+            }
+        });
         glView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
         addView(glView);
 
@@ -267,7 +291,7 @@ public abstract class MapComponent extends RelativeLayout {
         float width = glView.getWidth();
         float height = glView.getHeight();
 
-        float pixPadding = padding * 2 * spSize(getContext());
+        float pixPadding = padding * 2 * spSize;
         if (width - pixPadding > 0) {
             width -= pixPadding;
         }
@@ -276,8 +300,8 @@ public abstract class MapComponent extends RelativeLayout {
         }
 
         double log2 = 1 / log(2);
-        double zoomX = log(width / (renderer.tileSize * diffX)) * log2;
-        double zoomY = log(height / (renderer.tileSize * diffY)) * log2;
+        double zoomX = log(width / (tileSize * diffX)) * log2;
+        double zoomY = log(height / (tileSize * diffY)) * log2;
 
         float zoom = (float) min(zoomX, zoomY);
         if (zoom != zoom || zoom == Float.NEGATIVE_INFINITY || zoom == Float.POSITIVE_INFINITY) {
@@ -289,7 +313,7 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     public void moveSingle(float preX, float preY, float postX, float postY) {
-        double mercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
+        double mercatorPixelSize = mercatorPixelSize(tileSize, d.zoom);
         double x = (preX - postX) * mercatorPixelSize;
         double y = (preY - postY) * mercatorPixelSize;
 
@@ -309,11 +333,11 @@ public abstract class MapComponent extends RelativeLayout {
             return;
         }
 
-        double preMercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
+        double preMercatorPixelSize = mercatorPixelSize(tileSize, d.zoom);
 
         setZoom(d.zoom + (float) (log(diff) / log(2)));
 
-        double mercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
+        double mercatorPixelSize = mercatorPixelSize(tileSize, d.zoom);
 
         float surfaceCenterX = glView.getWidth() * 0.5f;
         float surfaceCenterY = glView.getHeight() * 0.5f;
@@ -343,11 +367,11 @@ public abstract class MapComponent extends RelativeLayout {
     }
 
     public void zoomIn(float x, float y) {
-        double preMercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
+        double preMercatorPixelSize = mercatorPixelSize(tileSize, d.zoom);
 
         setZoom(round(d.zoom + 1));
 
-        double mercatorPixelSize = mercatorPixelSize(renderer.tileSize, d.zoom);
+        double mercatorPixelSize = mercatorPixelSize(tileSize, d.zoom);
 
         x -= glView.getWidth() * 0.5f;
         y -= glView.getHeight() * 0.5f;
