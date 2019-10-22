@@ -49,13 +49,13 @@ public class MapComponentRenderer {
 
     // OpenGL objects
     public final TileKeyHashMap<CachedTile> tileCache = new TileKeyHashMap<>();
-    public int emptyTileTextureId;
+    public int emptyTileTexture;
 
     public MapShader mapShader;
+    public ColorShader colorShader;
     public int mapVbuffer;
     public int mapVbufferCount;
 
-    public ColorShader colorShader;
     public int currentPositionVbuffer;
     public int currentPositionVbufferCount;
     public int nodirCurrentPositionVbuffer;
@@ -110,9 +110,8 @@ public class MapComponentRenderer {
 
         if (mapShader == null) {
             mapShader = new MapShader();
-        }
+            colorShader = new ColorShader();
 
-        if (mapVbuffer == 0) {
             float[] mapBufferData = new float[]{0, 0, 0, 1, 1, 1, 1, 0};
             mapVbuffer = prepareStaticBuffer(mapBufferData);
             mapVbufferCount = mapBufferData.length / 2;
@@ -132,10 +131,6 @@ public class MapComponentRenderer {
         mapComponent.tileLoadPool.cancelUnused(tick);
 
         removeUnused();
-
-        if (colorShader == null) {
-            colorShader = new ColorShader();
-        }
 
         glUseProgram(colorShader.program);
         glEnableVertexAttribArray(colorShader.vertexLoc);
@@ -237,12 +232,12 @@ public class MapComponentRenderer {
         Matrix.scaleM(tmpMatrix, 0, scale, scale, 1);
         multiplyMM(tmpMatrix2, tmpMatrix, rotateMatrix);
 
-        if (emptyTileTextureId == 0) {
-            emptyTileTextureId = prepareTexture(1, 1, ByteBuffer.wrap(new byte[]{
+        if (emptyTileTexture == 0) {
+            emptyTileTexture = prepareTexture(1, 1, ByteBuffer.wrap(new byte[]{
                     (byte) 204, (byte) 247, (byte) 255, (byte) 255}));
         }
 
-        renderTile(tmpMatrix2, emptyTileTextureId, 1, 1, 0, 0);
+        renderTile(tmpMatrix2, emptyTileTexture, 1, 1, 0, 0);
     }
 
     public int getTexture(int z, int x, int y, int priority) {
@@ -257,7 +252,7 @@ public class MapComponentRenderer {
         }
 
         cacheItem.tick = tick;
-        return cacheItem.textureId;
+        return cacheItem.texture;
     }
 
     public void renderTile(float[] pvm, int texture, float scaleX, float scaleY, float shiftX, float shiftY) {
@@ -406,8 +401,8 @@ public class MapComponentRenderer {
             return;
         }
 
-        int textureId = prepareTexture(loadedTile.width, loadedTile.height, loadedTile.data);
-        tileCache.put(loadedTile, new CachedTile(textureId, tick));
+        int texture = prepareTexture(loadedTile.width, loadedTile.height, loadedTile.data);
+        tileCache.put(loadedTile, new CachedTile(texture, tick));
     }
 
     public float[] prepareSpData(float[] data) {
@@ -447,8 +442,8 @@ public class MapComponentRenderer {
             while (entry != null) {
                 CachedTile item = entry.value;
                 if (item.tick != tick) {
-                    if (item.textureId != 0) {
-                        itmp[0] = item.textureId;
+                    if (item.texture != 0) {
+                        itmp[0] = item.texture;
                         glDeleteTextures(1, itmp, 0);
                     }
                     tileCache.remove(entry);

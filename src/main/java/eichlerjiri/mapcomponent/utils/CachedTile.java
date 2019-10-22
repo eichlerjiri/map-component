@@ -2,11 +2,11 @@ package eichlerjiri.mapcomponent.utils;
 
 public class CachedTile {
 
-    public final int textureId;
+    public final int texture;
     public int tick;
 
     public CachedTile(int textureId, int tick) {
-        this.textureId = textureId;
+        this.texture = textureId;
         this.tick = tick;
     }
 }
