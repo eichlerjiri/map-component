@@ -11,15 +11,14 @@ import java.util.concurrent.TimeUnit;
 
 import eichlerjiri.mapcomponent.MapComponent;
 import eichlerjiri.mapcomponent.utils.LoadedTile;
+import eichlerjiri.mapcomponent.utils.ObjectMap;
 import eichlerjiri.mapcomponent.utils.RequestedTile;
-import eichlerjiri.mapcomponent.utils.TileKeyEntry;
-import eichlerjiri.mapcomponent.utils.TileKeyHashMap;
 
 public class TileLoadPool extends ThreadPoolExecutor {
 
     public final MapComponent mc;
     public final File cacheDir;
-    public final TileKeyHashMap<RequestedTile> requestedTiles = new TileKeyHashMap<>();
+    public final ObjectMap<RequestedTile> requestedTiles = new ObjectMap<>(RequestedTile.class);
 
     public final ConcurrentLinkedQueue<RequestedTile> cancelledTiles = new ConcurrentLinkedQueue<>();
     public final ConcurrentLinkedQueue<LoadedTile> loadedTiles = new ConcurrentLinkedQueue<>();
@@ -58,7 +57,7 @@ public class TileLoadPool extends ThreadPoolExecutor {
     }
 
     public void requestTile(int z, int x, int y, int tick, int priority) {
-        RequestedTile previousRunnable = requestedTiles.get(z, x, y);
+        RequestedTile previousRunnable = requestedTiles.get(mc.renderer.tkey.value(z, x, y));
 
         if (previousRunnable != null) {
             previousRunnable.tick = tick;
@@ -66,19 +65,18 @@ public class TileLoadPool extends ThreadPoolExecutor {
             previousRunnable.cancelled = false;
         } else {
             RequestedTile requestedTile = new RequestedTile(z, x, y, tick, priority);
-            requestedTiles.put(requestedTile, requestedTile);
+            requestedTiles.put(requestedTile);
 
             execute(new TileLoader(mc, requestedTile));
         }
     }
 
     public void cancelUnused(int tick) {
-        for (int i = 0; i < requestedTiles.entries.length; i++) {
-            TileKeyEntry<RequestedTile> entry = requestedTiles.entries[i];
+        for (int i = 0; i < requestedTiles.data.length; i++) {
+            RequestedTile entry = requestedTiles.data[i];
             while (entry != null) {
-                RequestedTile tile = entry.value;
-                if (tile.tick != tick) {
-                    tile.cancelled = true;
+                if (entry.tick != tick) {
+                    entry.cancelled = true;
                 }
                 entry = entry.next;
             }

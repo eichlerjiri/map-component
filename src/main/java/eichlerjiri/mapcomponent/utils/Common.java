@@ -38,14 +38,14 @@ public class Common {
         return context.getResources().getDisplayMetrics().scaledDensity;
     }
 
-    public static LoadedTile decodeTile(TileKey tileKey, byte[] data) {
+    public static LoadedTile decodeTile(int zoom, int x, int y, byte[] data) {
         if (data == null) {
-            return new LoadedTile(tileKey, 0, 0, null);
+            return new LoadedTile(zoom, x, y, 0, 0, null);
         }
 
         Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
         if (bitmap == null) {
-            return new LoadedTile(tileKey, 0, 0, null);
+            return new LoadedTile(zoom, x, y, 0, 0, null);
         }
 
         if (bitmap.getConfig() != Bitmap.Config.ARGB_8888) {
@@ -57,7 +57,7 @@ public class Common {
         bitmap.copyPixelsToBuffer(buffer);
         buffer.rewind();
 
-        return new LoadedTile(tileKey, bitmap.getWidth(), bitmap.getHeight(), buffer);
+        return new LoadedTile(zoom, x, y, bitmap.getWidth(), bitmap.getHeight(), buffer);
     }
 
     public static int createProgram(String vertexShaderSource, String fragmentShaderSource) {

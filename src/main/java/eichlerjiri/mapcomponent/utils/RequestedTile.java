@@ -1,6 +1,6 @@
 package eichlerjiri.mapcomponent.utils;
 
-public class RequestedTile extends TileKey {
+public class RequestedTile extends TileKey<RequestedTile> {
 
     public int tick;
     public volatile int priority;

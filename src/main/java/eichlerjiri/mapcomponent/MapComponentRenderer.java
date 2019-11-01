@@ -10,8 +10,8 @@ import eichlerjiri.mapcomponent.shaders.MapShader;
 import eichlerjiri.mapcomponent.utils.CachedTile;
 import eichlerjiri.mapcomponent.utils.FloatList;
 import eichlerjiri.mapcomponent.utils.LoadedTile;
-import eichlerjiri.mapcomponent.utils.TileKeyEntry;
-import eichlerjiri.mapcomponent.utils.TileKeyHashMap;
+import eichlerjiri.mapcomponent.utils.ObjectMap;
+import eichlerjiri.mapcomponent.utils.TileKey;
 
 import static android.opengl.GLES20.*;
 import static eichlerjiri.mapcomponent.utils.Common.*;
@@ -48,7 +48,7 @@ public class MapComponentRenderer {
     public final float[] rotateMatrix = new float[16];
 
     // OpenGL objects
-    public final TileKeyHashMap<CachedTile> tileCache = new TileKeyHashMap<>();
+    public final ObjectMap<CachedTile> tileCache = new ObjectMap<>(CachedTile.class);
     public int emptyTileTexture;
 
     public MapShader mapShader;
@@ -72,6 +72,7 @@ public class MapComponentRenderer {
     public float ftmpX;
     public float ftmpY;
     public final int[] itmp = new int[1];
+    public final TileKey<?> tkey = new TileKey<>(0, 0, 0);
 
     public MapComponentRenderer(MapComponent mapComponent) {
         this.mapComponent = mapComponent;
@@ -235,6 +236,8 @@ public class MapComponentRenderer {
         if (emptyTileTexture == 0) {
             emptyTileTexture = prepareTexture(1, 1, ByteBuffer.wrap(new byte[]{
                     (byte) 204, (byte) 247, (byte) 255, (byte) 255}));
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         }
 
         renderTile(tmpMatrix2, emptyTileTexture, 1, 1, 0, 0);
@@ -245,7 +248,7 @@ public class MapComponentRenderer {
             return 0;
         }
 
-        CachedTile cacheItem = tileCache.get(z, x, y);
+        CachedTile cacheItem = tileCache.get(tkey.value(z, x, y));
         if (cacheItem == null) {
             mapComponent.tileLoadPool.requestTile(z, x, y, tick, priority);
             return 0;
@@ -397,12 +400,15 @@ public class MapComponentRenderer {
 
     public void tileLoaded(LoadedTile loadedTile) {
         if (loadedTile.data == null) {
-            tileCache.put(loadedTile, new CachedTile(0, tick));
+            tileCache.put(new CachedTile(loadedTile.zoom, loadedTile.x, loadedTile.y, 0, tick));
             return;
         }
 
         int texture = prepareTexture(loadedTile.width, loadedTile.height, loadedTile.data);
-        tileCache.put(loadedTile, new CachedTile(texture, tick));
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        tileCache.put(new CachedTile(loadedTile.zoom, loadedTile.x, loadedTile.y, texture, tick));
     }
 
     public float[] prepareSpData(float[] data) {
@@ -428,22 +434,17 @@ public class MapComponentRenderer {
 
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         return texture;
     }
 
     public void removeUnused() {
-        for (int i = 0; i < tileCache.entries.length; i++) {
-            TileKeyEntry<CachedTile> entry = tileCache.entries[i];
+        for (int i = 0; i < tileCache.data.length; i++) {
+            CachedTile entry = tileCache.data[i];
             while (entry != null) {
-                CachedTile item = entry.value;
-                if (item.tick != tick) {
-                    if (item.texture != 0) {
-                        itmp[0] = item.texture;
+                if (entry.tick != tick) {
+                    if (entry.texture != 0) {
+                        itmp[0] = entry.texture;
                         glDeleteTextures(1, itmp, 0);
                     }
                     tileCache.remove(entry);

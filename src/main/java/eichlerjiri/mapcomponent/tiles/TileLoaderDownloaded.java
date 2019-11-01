@@ -25,7 +25,7 @@ public class TileLoaderDownloaded extends TileRunnable {
                 priority = tile.priority;
                 mc.tileLoadPool.execute(this);
             } else {
-                LoadedTile loadedTile = decodeTile(tile, data);
+                LoadedTile loadedTile = decodeTile(tile.zoom, tile.x, tile.y, data);
                 mc.tileLoadPool.loadedTiles.add(loadedTile);
                 mc.glView.requestRender();
 

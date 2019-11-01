@@ -27,7 +27,7 @@ public class TileLoader extends TileRunnable {
                         "tiles/ " + tile.zoom + "/" + tile.x + "/" + tile.y + ".png");
 
                 if (cacheFile.exists()) {
-                    mc.tileLoadPool.loadedTiles.add(decodeTile(tile, readFile(cacheFile)));
+                    mc.tileLoadPool.loadedTiles.add(decodeTile(tile.zoom, tile.x, tile.y, readFile(cacheFile)));
                     mc.glView.requestRender();
                 } else {
                     mc.tileDownloadPool.execute(new TileDownloader(mc, tile));
