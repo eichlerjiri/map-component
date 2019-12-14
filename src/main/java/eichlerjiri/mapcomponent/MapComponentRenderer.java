@@ -375,7 +375,7 @@ public class MapComponentRenderer {
         }
 
         glBindBuffer(GL_ARRAY_BUFFER, pathVbuffer);
-        glBufferData(GL_ARRAY_BUFFER, fltmp.size * 4, pathVtmp, GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, fltmp.size * 4, pathVtmp, GL_STREAM_DRAW);
         renderColor(mapMatrix, pathVbuffer, fltmp.size / 2, GL_TRIANGLES, 0, 0, 0, 1);
 
         fltmp.size = 0;
