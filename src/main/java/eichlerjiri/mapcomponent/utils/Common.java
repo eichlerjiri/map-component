@@ -16,7 +16,6 @@ import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
 import java.nio.ByteBuffer;
 
 import static android.opengl.GLES20.*;
@@ -81,9 +80,9 @@ public class Common {
     }
 
     public static byte[] download(String url) throws InterruptedIOException {
-        URLConnection conn = null;
+        HttpURLConnection conn = null;
         try {
-            conn = new URL(url).openConnection();
+            conn = (HttpURLConnection) new URL(url).openConnection();
             conn.setRequestProperty("User-Agent",
                     "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:64.0) Gecko/20100101 Firefox/64.0");
             InputStream is = conn.getInputStream();
@@ -96,8 +95,8 @@ public class Common {
             throw e;
         } catch (IOException e) {
             Log.e("Common", "Cannot download file: " + url, e);
-            if (conn instanceof HttpURLConnection) {
-                InputStream es = ((HttpURLConnection) conn).getErrorStream();
+            if (conn != null) {
+                InputStream es = conn.getErrorStream();
                 if (es != null) {
                     readAll(es);
                     closeStream(es);
@@ -121,12 +120,11 @@ public class Common {
         }
     }
 
-    public static boolean writeFile(File file, byte[] data) throws InterruptedIOException {
+    public static void writeFile(File file, byte[] data) throws InterruptedIOException {
         try {
             FileOutputStream fos = new FileOutputStream(file);
             try {
                 fos.write(data);
-                return true;
             } finally {
                 closeStream(fos);
             }
@@ -134,7 +132,6 @@ public class Common {
             throw e;
         } catch (IOException e) {
             Log.e("Common", "Cannot write file: " + file, e);
-            return false;
         }
     }
 

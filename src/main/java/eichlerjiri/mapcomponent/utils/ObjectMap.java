@@ -35,11 +35,7 @@ public class ObjectMap<T extends ObjectMapEntry<T>> {
             entry = entry.next;
         }
 
-        if (entry != null) {
-            item.next = entry;
-        } else {
-            item.next = null;
-        }
+        item.next = entry;
 
         if (prev != null) {
             prev.next = item;
