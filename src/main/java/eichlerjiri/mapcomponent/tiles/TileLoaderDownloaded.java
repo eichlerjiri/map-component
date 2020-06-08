@@ -30,8 +30,7 @@ public class TileLoaderDownloaded extends TileRunnable {
                 mc.glView.requestRender();
 
                 if (loadedTile.data != null) {
-                    File cacheFile = new File(mc.tileLoadPool.cacheDir,
-                            "tiles/ " + tile.zoom + "/" + tile.x + "/" + tile.y + ".png");
+                    File cacheFile = new File(mc.tileLoadPool.cacheDir, "tiles/ " + tile.zoom + "/" + tile.x + "/" + tile.y + ".png");
 
                     cacheFile.getParentFile().mkdirs();
                     writeFile(cacheFile, data);

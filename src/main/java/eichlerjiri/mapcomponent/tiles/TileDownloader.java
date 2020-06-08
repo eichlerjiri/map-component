@@ -22,8 +22,7 @@ public class TileDownloader extends TileRunnable {
                 priority = tile.priority;
                 mc.tileDownloadPool.execute(this);
             } else {
-                byte[] data = download(mc.tileDownloadPool.getServerUrl() +
-                        tile.zoom + "/" + tile.x + "/" + tile.y + ".png");
+                byte[] data = download(mc.tileDownloadPool.getServerUrl() + tile.zoom + "/" + tile.x + "/" + tile.y + ".png");
 
                 mc.tileLoadPool.execute(new TileLoaderDownloaded(mc, tile, data));
             }

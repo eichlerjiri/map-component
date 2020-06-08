@@ -23,8 +23,7 @@ public class TileLoader extends TileRunnable {
                 priority = tile.priority;
                 mc.tileLoadPool.execute(this);
             } else {
-                File cacheFile = new File(mc.tileLoadPool.cacheDir,
-                        "tiles/ " + tile.zoom + "/" + tile.x + "/" + tile.y + ".png");
+                File cacheFile = new File(mc.tileLoadPool.cacheDir, "tiles/ " + tile.zoom + "/" + tile.x + "/" + tile.y + ".png");
 
                 if (cacheFile.exists()) {
                     mc.tileLoadPool.loadedTiles.add(decodeTile(tile.zoom, tile.x, tile.y, readFile(cacheFile)));

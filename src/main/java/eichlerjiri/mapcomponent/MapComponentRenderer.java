@@ -234,8 +234,7 @@ public class MapComponentRenderer {
         multiplyMM(tmpMatrix2, tmpMatrix, rotateMatrix);
 
         if (emptyTileTexture == 0) {
-            emptyTileTexture = prepareTexture(1, 1, ByteBuffer.wrap(new byte[]{
-                    (byte) 204, (byte) 247, (byte) 255, (byte) 255}));
+            emptyTileTexture = prepareTexture(1, 1, ByteBuffer.wrap(new byte[]{(byte) 204, (byte) 247, (byte) 255, (byte) 255}));
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         }
@@ -292,8 +291,7 @@ public class MapComponentRenderer {
                 nodirCurrentPositionVbufferCount = data.length / 2;
             }
 
-            renderColor(tmpMatrix, nodirCurrentPositionVbuffer, nodirCurrentPositionVbufferCount,
-                    GL_TRIANGLES, 0, 0, 1, 1);
+            renderColor(tmpMatrix, nodirCurrentPositionVbuffer, nodirCurrentPositionVbufferCount, GL_TRIANGLES, 0, 0, 1, 1);
         }
     }
 
