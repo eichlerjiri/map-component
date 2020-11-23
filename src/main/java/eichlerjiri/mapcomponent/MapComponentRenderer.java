@@ -20,12 +20,10 @@ import static java.lang.Math.*;
 public class MapComponentRenderer {
 
     public final MapComponent mapComponent;
+    public volatile MapDataRenderer dr = new MapDataRenderer(0, 0, 0, 0, 0, 0);
 
     public MapData d;
     public int tick;
-
-    public int w;
-    public int h;
 
     // zoom-related values
     public float zoom = Float.NEGATIVE_INFINITY;
@@ -53,8 +51,8 @@ public class MapComponentRenderer {
 
     public MapShader mapShader;
     public ColorShader colorShader;
-    public int mapVbuffer;
-    public int mapVbufferCount;
+    public int squareVbuffer;
+    public int squareVbufferCount;
 
     public int currentPositionVbuffer;
     public int currentPositionVbufferCount;
@@ -76,13 +74,15 @@ public class MapComponentRenderer {
 
     public MapComponentRenderer(MapComponent mapComponent) {
         this.mapComponent = mapComponent;
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
 
     public void setDimensions(int width, int height) {
         glViewport(0, 0, width, height);
 
-        w = width;
-        h = height;
+        dr = new MapDataRenderer(width, height, width - 20 - 80, 20, 80, 80);
 
         refreshScreenSizeValues();
     }
@@ -114,13 +114,13 @@ public class MapComponentRenderer {
             colorShader = new ColorShader();
 
             float[] mapBufferData = new float[]{0, 0, 0, 1, 1, 1, 1, 0};
-            mapVbuffer = prepareStaticBuffer(mapBufferData);
-            mapVbufferCount = mapBufferData.length / 2;
+            squareVbuffer = prepareStaticBuffer(mapBufferData);
+            squareVbufferCount = mapBufferData.length / 2;
         }
 
         glUseProgram(mapShader.program);
         glEnableVertexAttribArray(mapShader.vertexLoc);
-        glBindBuffer(GL_ARRAY_BUFFER, mapVbuffer);
+        glBindBuffer(GL_ARRAY_BUFFER, squareVbuffer);
         glVertexAttribPointer(mapShader.vertexLoc, 2, GL_FLOAT, false, 0, 0);
 
         for (int i = centerTileX - searchDist; i <= centerTileX + searchDist; i++) {
@@ -147,6 +147,10 @@ public class MapComponentRenderer {
         }
         if (d.currentPositionX != Double.NEGATIVE_INFINITY) {
             drawCurrentPosition(d.currentPositionX, d.currentPositionY, d.currentPositionAzimuth);
+        }
+
+        if (!d.centered) {
+            drawCenterButton();
         }
     }
 
@@ -262,7 +266,7 @@ public class MapComponentRenderer {
 
         glUniform4f(mapShader.scaleShiftLoc, scaleX, scaleY, shiftX, shiftY);
         glUniformMatrix4fv(mapShader.pvmLoc, 1, false, pvm, 0);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, mapVbufferCount);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, squareVbufferCount);
     }
 
     public void drawCurrentPosition(double x, double y, float positionAzimuth) {
@@ -280,17 +284,7 @@ public class MapComponentRenderer {
 
             renderColor(tmpMatrix, currentPositionVbuffer, currentPositionVbufferCount, GL_TRIANGLES, 0, 0, 1, 1);
         } else {
-            if (nodirCurrentPositionVbuffer == 0) {
-                float[] data = prepareSpData(new float[]{
-                        -12, 0, -8, 0, 0, 12, 0, 12, 0, 8, -8, 0,
-                        12, 0, 8, 0, 0, -12, 0, -12, 0, -8, 8, 0,
-                        -12, 0, -8, 0, 0, -12, 0, -12, 0, -8, -8, 0,
-                        12, 0, 8, 0, 0, 12, 0, 12, 0, 8, 8, 0
-                });
-                nodirCurrentPositionVbuffer = prepareStaticBuffer(data);
-                nodirCurrentPositionVbufferCount = data.length / 2;
-            }
-
+            prepareNodirCurrentPositionVbuffer();
             renderColor(tmpMatrix, nodirCurrentPositionVbuffer, nodirCurrentPositionVbufferCount, GL_TRIANGLES, 0, 0, 1, 1);
         }
     }
@@ -379,6 +373,19 @@ public class MapComponentRenderer {
         fltmp.size = 0;
     }
 
+    public void drawCenterButton() {
+        Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, dr.centerButtonX, dr.centerButtonY, 0);
+        Matrix.scaleM(tmpMatrix, 0, dr.centerButtonWidth, dr.centerButtonHeight, 1);
+
+        renderColor(tmpMatrix, squareVbuffer, squareVbufferCount, GL_TRIANGLE_FAN, 1, 1, 1, 0.6f);
+
+        Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, dr.centerButtonX + dr.centerButtonWidth / 2, dr.centerButtonY + dr.centerButtonHeight / 2, 0);
+        Matrix.scaleM(tmpMatrix, 0, 1.3f, 1.3f, 1);
+
+        prepareNodirCurrentPositionVbuffer();
+        renderColor(tmpMatrix, nodirCurrentPositionVbuffer, nodirCurrentPositionVbufferCount, GL_TRIANGLES, 0, 0, 1, 1);
+    }
+
     public void renderColor(float[] pvm, int buffer, int bufferCount, int type, float r, float g, float b, float a) {
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
         glVertexAttribPointer(colorShader.vertexLoc, 2, GL_FLOAT, false, 0, 0);
@@ -394,6 +401,19 @@ public class MapComponentRenderer {
 
         ftmpX = surfaceCenterX + x * azimuthCos - y * azimuthSin;
         ftmpY = surfaceCenterY + y * azimuthCos + x * azimuthSin;
+    }
+
+    public void prepareNodirCurrentPositionVbuffer() {
+        if (nodirCurrentPositionVbuffer == 0) {
+            float[] data = prepareSpData(new float[]{
+                    -12, 0, -8, 0, 0, 12, 0, 12, 0, 8, -8, 0,
+                    12, 0, 8, 0, 0, -12, 0, -12, 0, -8, 8, 0,
+                    -12, 0, -8, 0, 0, -12, 0, -12, 0, -8, -8, 0,
+                    12, 0, 8, 0, 0, 12, 0, 12, 0, 8, 8, 0
+            });
+            nodirCurrentPositionVbuffer = prepareStaticBuffer(data);
+            nodirCurrentPositionVbufferCount = data.length / 2;
+        }
     }
 
     public void tileLoaded(LoadedTile loadedTile) {
@@ -453,14 +473,14 @@ public class MapComponentRenderer {
     }
 
     public void refreshScreenSizeValues() {
-        surfaceCenterX = w * 0.5f;
-        surfaceCenterY = h * 0.5f;
+        surfaceCenterX = dr.width * 0.5f;
+        surfaceCenterY = dr.height * 0.5f;
 
-        int tilesNecessaryBase = (int) (sqrt(w * w + h * h) / mapComponent.tileSize);
+        int tilesNecessaryBase = (int) (sqrt(dr.width * dr.width + dr.height * dr.height) / mapComponent.tileSize);
         searchDist = 1 + tilesNecessaryBase / 2;
 
-        if (w != 0 && h != 0) {
-            Matrix.orthoM(mapMatrix, 0, 0, w, h, 0, -10, 10);
+        if (dr.width != 0 && dr.height != 0) {
+            Matrix.orthoM(mapMatrix, 0, 0, dr.width, dr.height, 0, -10, 10);
         } else {
             Matrix.setIdentityM(mapMatrix, 0);
         }

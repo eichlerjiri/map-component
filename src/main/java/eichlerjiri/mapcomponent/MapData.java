@@ -7,6 +7,8 @@ public class MapData {
     public float zoom;
     public float azimuth;
 
+    public boolean centered = true;
+
     public double currentPositionX = Double.NEGATIVE_INFINITY;
     public double currentPositionY = Double.NEGATIVE_INFINITY;
     public float currentPositionAzimuth = Float.NEGATIVE_INFINITY;
@@ -25,6 +27,8 @@ public class MapData {
         n.posY = posY;
         n.zoom = zoom;
         n.azimuth = azimuth;
+
+        n.centered = centered;
 
         n.currentPositionX = currentPositionX;
         n.currentPositionY = currentPositionY;

@@ -5,10 +5,6 @@ import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
-import android.view.View;
-import android.widget.Button;
-import android.widget.LinearLayout;
-import android.widget.RelativeLayout;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -20,14 +16,12 @@ import eichlerjiri.mapcomponent.utils.ObjectList;
 import static eichlerjiri.mapcomponent.utils.Common.*;
 import static java.lang.Math.*;
 
-public abstract class MapComponent extends RelativeLayout {
+public abstract class MapComponent extends GLSurfaceView {
 
-    public final GLSurfaceView glView;
     public final float spSize;
     public final float tileSize;
 
     public MapComponentRenderer renderer;
-
     public final MapData d = new MapData();
     public volatile MapData dCommited = new MapData();
 
@@ -35,43 +29,26 @@ public abstract class MapComponent extends RelativeLayout {
     public final TileDownloadPool tileDownloadPool;
 
     public final GestureDetector gestureDetector;
-    public final LinearLayout centerButtonLayout;
 
+    public int pressed = -1;
     public float lastX1 = Float.NEGATIVE_INFINITY;
     public float lastY1 = Float.NEGATIVE_INFINITY;
     public float lastX2 = Float.NEGATIVE_INFINITY;
     public float lastY2 = Float.NEGATIVE_INFINITY;
 
-    public boolean centered = true;
-
     public MapComponent(Context context, ObjectList<String> mapUrls) {
         super(context);
-        glView = new GLSurfaceView(context);
         spSize = spSize(context);
         tileSize = 256 * spSize;
 
         tileLoadPool = new TileLoadPool(context, this);
         tileDownloadPool = new TileDownloadPool(mapUrls);
 
-        glView.setZOrderOnTop(true); // no black flash on load
-        glView.setZOrderMediaOverlay(true);
+        setZOrderOnTop(true); // no black flash on load
+        setZOrderMediaOverlay(true);
 
-        centerButtonLayout = new LinearLayout(context);
-        Button centerButton = new Button(context);
-        centerButton.setBackgroundResource(R.mipmap.center);
-        centerButtonLayout.addView(centerButton);
-        centerButtonLayout.setBackgroundColor(0x99ffffff);
-
-        int size = round(40 * spSize);
-        int margin = round(10 * spSize);
-
-        RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(size, size);
-        params.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
-        params.setMargins(margin, margin, margin, margin);
-        centerButtonLayout.setLayoutParams(params);
-
-        glView.setEGLContextClientVersion(2);
-        glView.setRenderer(new GLSurfaceView.Renderer() {
+        setEGLContextClientVersion(2);
+        setRenderer(new GLSurfaceView.Renderer() {
             @Override
             public void onSurfaceCreated(GL10 gl10, EGLConfig eglConfig) {
                 Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
@@ -88,8 +65,7 @@ public abstract class MapComponent extends RelativeLayout {
                 renderer.drawFrame();
             }
         });
-        glView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
-        addView(glView);
+        setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
 
         gestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
             @Override
@@ -97,13 +73,6 @@ public abstract class MapComponent extends RelativeLayout {
                 zoomIn(e.getX(), e.getY());
                 commit();
                 return true;
-            }
-        });
-
-        centerButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startCentering();
             }
         });
     }
@@ -115,7 +84,7 @@ public abstract class MapComponent extends RelativeLayout {
         ret.putDouble("posY", d.posY);
         ret.putFloat("zoom", d.zoom);
         ret.putFloat("azimuth", d.azimuth);
-        ret.putBoolean("centered", centered);
+        ret.putBoolean("centered", d.centered);
 
         return ret;
     }
@@ -125,28 +94,25 @@ public abstract class MapComponent extends RelativeLayout {
         d.posY = bundle.getDouble("posY");
         d.zoom = bundle.getFloat("zoom");
         d.azimuth = bundle.getFloat("azimuth");
-        commit();
 
         if (bundle.getBoolean("centered")) {
             startCentering();
         } else {
             stopCentering();
         }
+
+        commit();
     }
 
     public abstract void centerMap();
 
     public void stopCentering() {
-        if (centered) {
-            addView(centerButtonLayout);
-            centered = false;
-        }
+        d.centered = false;
     }
 
     public void startCentering() {
-        if (!centered) {
-            removeView(centerButtonLayout);
-            centered = true;
+        if (!d.centered) {
+            d.centered = true;
             centerMap();
         }
     }
@@ -175,13 +141,22 @@ public abstract class MapComponent extends RelativeLayout {
 
     public void commit() {
         dCommited = d.copy();
-        glView.requestRender();
+        requestRender();
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         gestureDetector.onTouchEvent(event);
         int action = event.getActionMasked();
+
+        if (pressed != -1) {
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP) {
+                if (pressed == event.getPointerId(event.getActionIndex())) {
+                    pressed = -1;
+                }
+            }
+            return true;
+        }
 
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             int index = event.getActionIndex();
@@ -190,8 +165,15 @@ public abstract class MapComponent extends RelativeLayout {
             float y = event.getY(index);
 
             if (id == 0) {
-                lastX1 = x;
-                lastY1 = y;
+                MapDataRenderer dr = renderer.dr;
+                if (dr.centerButtonX <= x && dr.centerButtonX + dr.centerButtonWidth > x && dr.centerButtonY <= y && dr.centerButtonY + dr.centerButtonHeight > y) {
+                    pressed = id;
+                    startCentering();
+                    commit();
+                } else {
+                    lastX1 = x;
+                    lastY1 = y;
+                }
             } else if (id == 1) {
                 lastX2 = x;
                 lastY2 = y;
@@ -219,7 +201,7 @@ public abstract class MapComponent extends RelativeLayout {
                 float y = event.getY(i);
 
                 if (id == 0) {
-                    if (lastX2 == Float.NEGATIVE_INFINITY) {
+                    if (lastX1 != Float.NEGATIVE_INFINITY && lastX2 == Float.NEGATIVE_INFINITY) {
                         stopCentering();
                         moveSingle(lastX1, lastY1, x, y);
                         commit();
@@ -288,8 +270,8 @@ public abstract class MapComponent extends RelativeLayout {
         double diffX = x2 - x1;
         double diffY = y2 - y1;
 
-        float width = glView.getWidth();
-        float height = glView.getHeight();
+        float width = getWidth();
+        float height = getHeight();
 
         float pixPadding = padding * 2 * spSize;
         if (width - pixPadding > 0) {
@@ -339,8 +321,8 @@ public abstract class MapComponent extends RelativeLayout {
 
         double mercatorPixelSize = mercatorPixelSize(tileSize, d.zoom);
 
-        float surfaceCenterX = glView.getWidth() * 0.5f;
-        float surfaceCenterY = glView.getHeight() * 0.5f;
+        float surfaceCenterX = getWidth() * 0.5f;
+        float surfaceCenterY = getHeight() * 0.5f;
         preX1 -= surfaceCenterX;
         preY1 -= surfaceCenterY;
         preX2 -= surfaceCenterX;
@@ -373,8 +355,8 @@ public abstract class MapComponent extends RelativeLayout {
 
         double mercatorPixelSize = mercatorPixelSize(tileSize, d.zoom);
 
-        x -= glView.getWidth() * 0.5f;
-        y -= glView.getHeight() * 0.5f;
+        x -= getWidth() * 0.5f;
+        y -= getHeight() * 0.5f;
 
         double rad = toRadians(d.azimuth);
         double azimuthCos = cos(rad);
