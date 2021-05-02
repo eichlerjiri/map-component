@@ -23,18 +23,10 @@ import static java.lang.Math.*;
 
 public class Common {
 
-    public static double mercatorPixelSize(float tileSize, float zoom) {
-        return 1 / (tileSize * pow(2, zoom));
-    }
-
     public static float computeDistance(float x1, float y1, float x2, float y2) {
         float xDiff = x1 - x2;
         float yDiff = y1 - y2;
         return (float) sqrt(xDiff * xDiff + yDiff * yDiff);
-    }
-
-    public static float spSize(Context context) {
-        return context.getResources().getDisplayMetrics().scaledDensity;
     }
 
     public static LoadedTile decodeTile(int zoom, int x, int y, byte[] data) {

@@ -11,20 +11,9 @@ public class ObjectList<T> {
         data = (T[]) Array.newInstance(clazz, 8);
     }
 
-    public void ensureCapacity(int extra) {
-        int newCapacity = data.length * 2;
-        while (newCapacity < size + extra) {
-            newCapacity *= 2;
-        }
-
-        T[] dataNew = (T[]) Array.newInstance(data.getClass().getComponentType(), newCapacity);
-        System.arraycopy(data, 0, dataNew, 0, size);
-        data = dataNew;
-    }
-
     public void add(T v) {
         if (data.length < size + 1) {
-            ensureCapacity(1);
+            zz_ensureCapacity(1);
         }
 
         data[size++] = v;
@@ -41,5 +30,16 @@ public class ObjectList<T> {
                 return;
             }
         }
+    }
+
+    public void zz_ensureCapacity(int extra) {
+        int newCapacity = data.length * 2;
+        while (newCapacity < size + extra) {
+            newCapacity *= 2;
+        }
+
+        T[] dataNew = (T[]) Array.newInstance(data.getClass().getComponentType(), newCapacity);
+        System.arraycopy(data, 0, dataNew, 0, size);
+        data = dataNew;
     }
 }

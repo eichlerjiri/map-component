@@ -38,7 +38,7 @@ public abstract class MapComponent extends GLSurfaceView {
 
     public MapComponent(Context context, ObjectList<String> mapUrls) {
         super(context);
-        spSize = spSize(context);
+        spSize = context.getResources().getDisplayMetrics().scaledDensity;
         tileSize = 256 * spSize;
 
         tileLoadPool = new TileLoadPool(context, this);
@@ -70,7 +70,7 @@ public abstract class MapComponent extends GLSurfaceView {
         gestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onDoubleTap(MotionEvent e) {
-                zoomIn(e.getX(), e.getY());
+                zz_zoomIn(e.getX(), e.getY());
                 commit();
                 return true;
             }
@@ -96,26 +96,15 @@ public abstract class MapComponent extends GLSurfaceView {
         d.azimuth = bundle.getFloat("azimuth");
 
         if (bundle.getBoolean("centered")) {
-            startCentering();
+            zz_startCentering();
         } else {
-            stopCentering();
+            zz_stopCentering();
         }
 
         commit();
     }
 
     public abstract void centerMap();
-
-    public void stopCentering() {
-        d.centered = false;
-    }
-
-    public void startCentering() {
-        if (!d.centered) {
-            d.centered = true;
-            centerMap();
-        }
-    }
 
     public void setCurrentPosition(double x, double y, float azimuth) {
         d.currentPositionX = x;
@@ -168,7 +157,7 @@ public abstract class MapComponent extends GLSurfaceView {
                 MapDataRenderer dr = renderer.dr;
                 if (dr.centerButtonX <= x && dr.centerButtonX + dr.centerButtonWidth > x && dr.centerButtonY <= y && dr.centerButtonY + dr.centerButtonHeight > y) {
                     pressed = id;
-                    startCentering();
+                    zz_startCentering();
                     commit();
                 } else {
                     lastX1 = x;
@@ -202,8 +191,8 @@ public abstract class MapComponent extends GLSurfaceView {
 
                 if (id == 0) {
                     if (lastX1 != Float.NEGATIVE_INFINITY && lastX2 == Float.NEGATIVE_INFINITY) {
-                        stopCentering();
-                        moveSingle(lastX1, lastY1, x, y);
+                        zz_stopCentering();
+                        zz_moveSingle(lastX1, lastY1, x, y);
                         commit();
                     }
 
@@ -216,8 +205,8 @@ public abstract class MapComponent extends GLSurfaceView {
             }
 
             if (lastX1 != Float.NEGATIVE_INFINITY && lastX2 != Float.NEGATIVE_INFINITY) {
-                stopCentering();
-                moveDouble(preX1, preY1, preX2, preY2, lastX1, lastY1, lastX2, lastY2);
+                zz_stopCentering();
+                zz_moveDouble(preX1, preY1, preX2, preY2, lastX1, lastY1, lastX2, lastY2);
                 commit();
             }
         }
@@ -294,8 +283,24 @@ public abstract class MapComponent extends GLSurfaceView {
         setAzimuth(0);
     }
 
-    public void moveSingle(float preX, float preY, float postX, float postY) {
-        double mercatorPixelSize = mercatorPixelSize(tileSize, d.zoom);
+    public void close() {
+        tileLoadPool.shutdownNow();
+        tileDownloadPool.shutdownNow();
+    }
+
+    public void zz_stopCentering() {
+        d.centered = false;
+    }
+
+    public void zz_startCentering() {
+        if (!d.centered) {
+            d.centered = true;
+            centerMap();
+        }
+    }
+
+    public void zz_moveSingle(float preX, float preY, float postX, float postY) {
+        double mercatorPixelSize = 1 / (tileSize * pow(2, d.zoom));
         double x = (preX - postX) * mercatorPixelSize;
         double y = (preY - postY) * mercatorPixelSize;
 
@@ -306,7 +311,7 @@ public abstract class MapComponent extends GLSurfaceView {
         setPosition(d.posX + x * azimuthCos + y * azimuthSin, d.posY + y * azimuthCos - x * azimuthSin);
     }
 
-    public void moveDouble(float preX1, float preY1, float preX2, float preY2,
+    public void zz_moveDouble(float preX1, float preY1, float preX2, float preY2,
             float postX1, float postY1, float postX2, float postY2) {
         float preDist = computeDistance(preX1, preY1, preX2, preY2);
         float postDist = computeDistance(postX1, postY1, postX2, postY2);
@@ -315,11 +320,11 @@ public abstract class MapComponent extends GLSurfaceView {
             return;
         }
 
-        double preMercatorPixelSize = mercatorPixelSize(tileSize, d.zoom);
+        double preMercatorPixelSize = 1 / (tileSize * pow(2, d.zoom));
 
         setZoom(d.zoom + (float) (log(diff) / log(2)));
 
-        double mercatorPixelSize = mercatorPixelSize(tileSize, d.zoom);
+        double mercatorPixelSize = 1 / (tileSize * pow(2, d.zoom));
 
         float surfaceCenterX = getWidth() * 0.5f;
         float surfaceCenterY = getHeight() * 0.5f;
@@ -348,12 +353,12 @@ public abstract class MapComponent extends GLSurfaceView {
         setPosition(posX2, posY2);
     }
 
-    public void zoomIn(float x, float y) {
-        double preMercatorPixelSize = mercatorPixelSize(tileSize, d.zoom);
+    public void zz_zoomIn(float x, float y) {
+        double preMercatorPixelSize = 1 / (tileSize * pow(2, d.zoom));
 
         setZoom(round(d.zoom + 1));
 
-        double mercatorPixelSize = mercatorPixelSize(tileSize, d.zoom);
+        double mercatorPixelSize = 1 / (tileSize * pow(2, d.zoom));
 
         x -= getWidth() * 0.5f;
         y -= getHeight() * 0.5f;
@@ -365,10 +370,5 @@ public abstract class MapComponent extends GLSurfaceView {
         double px = d.posX + (x * azimuthCos + y * azimuthSin) * (preMercatorPixelSize - mercatorPixelSize);
         double py = d.posY + (y * azimuthCos - x * azimuthSin) * (preMercatorPixelSize - mercatorPixelSize);
         setPosition(px, py);
-    }
-
-    public void close() {
-        tileLoadPool.shutdownNow();
-        tileDownloadPool.shutdownNow();
     }
 }
