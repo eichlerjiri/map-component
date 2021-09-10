@@ -2,9 +2,9 @@ package eichlerjiri.mapcomponent.tiles;
 
 import android.content.Context;
 import eichlerjiri.mapcomponent.MapComponent;
-import eichlerjiri.mapcomponent.utils.LoadedTile;
 import eichlerjiri.mapcomponent.utils.ObjectMap;
-import eichlerjiri.mapcomponent.utils.RequestedTile;
+import eichlerjiri.mapcomponent.utils.TileKey.LoadedTile;
+import eichlerjiri.mapcomponent.utils.TileKey.RequestedTile;
 import java.io.File;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.PriorityBlockingQueue;

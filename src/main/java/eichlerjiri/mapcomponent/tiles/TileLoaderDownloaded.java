@@ -2,8 +2,8 @@ package eichlerjiri.mapcomponent.tiles;
 
 import eichlerjiri.mapcomponent.MapComponent;
 import static eichlerjiri.mapcomponent.utils.Common.*;
-import eichlerjiri.mapcomponent.utils.LoadedTile;
-import eichlerjiri.mapcomponent.utils.RequestedTile;
+import eichlerjiri.mapcomponent.utils.TileKey.LoadedTile;
+import eichlerjiri.mapcomponent.utils.TileKey.RequestedTile;
 import java.io.File;
 import java.io.InterruptedIOException;
 

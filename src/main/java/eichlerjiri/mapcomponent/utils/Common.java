@@ -4,6 +4,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import static android.opengl.GLES20.*;
 import android.util.Log;
+import eichlerjiri.mapcomponent.utils.TileKey.LoadedTile;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;

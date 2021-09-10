@@ -1,5 +1,6 @@
 package eichlerjiri.mapcomponent.utils;
 
+import eichlerjiri.mapcomponent.utils.ObjectMap.ObjectMapEntry;
 import java.lang.reflect.Array;
 
 public class ObjectMap<T extends ObjectMapEntry<T>> {
@@ -87,5 +88,10 @@ public class ObjectMap<T extends ObjectMapEntry<T>> {
                 entry = next;
             }
         }
+    }
+
+    public static class ObjectMapEntry<T> {
+
+        public T next;
     }
 }

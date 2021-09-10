@@ -1,7 +1,7 @@
 package eichlerjiri.mapcomponent.tiles;
 
 import eichlerjiri.mapcomponent.MapComponent;
-import eichlerjiri.mapcomponent.utils.RequestedTile;
+import eichlerjiri.mapcomponent.utils.TileKey.RequestedTile;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public abstract class TileRunnable implements Runnable, Comparable<TileRunnable> {
