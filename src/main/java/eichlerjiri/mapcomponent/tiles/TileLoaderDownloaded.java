@@ -1,13 +1,11 @@
 package eichlerjiri.mapcomponent.tiles;
 
-import java.io.File;
-import java.io.InterruptedIOException;
-
 import eichlerjiri.mapcomponent.MapComponent;
+import static eichlerjiri.mapcomponent.utils.Common.*;
 import eichlerjiri.mapcomponent.utils.LoadedTile;
 import eichlerjiri.mapcomponent.utils.RequestedTile;
-
-import static eichlerjiri.mapcomponent.utils.Common.*;
+import java.io.File;
+import java.io.InterruptedIOException;
 
 public class TileLoaderDownloaded extends TileRunnable {
 
@@ -21,8 +19,8 @@ public class TileLoaderDownloaded extends TileRunnable {
     @Override
     public void run() {
         try {
-            if (priority != tile.priority) {
-                priority = tile.priority;
+            if (priority.get() != tile.priority.get()) {
+                priority.set(tile.priority.get());
                 mc.tileLoadPool.execute(this);
             } else {
                 LoadedTile loadedTile = decodeTile(tile.zoom, tile.x, tile.y, data);

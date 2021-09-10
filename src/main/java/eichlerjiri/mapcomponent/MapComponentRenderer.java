@@ -1,26 +1,24 @@
 package eichlerjiri.mapcomponent;
 
+import static android.opengl.GLES20.*;
 import android.opengl.Matrix;
-
-import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
-
 import eichlerjiri.mapcomponent.shaders.ColorShader;
 import eichlerjiri.mapcomponent.shaders.MapShader;
 import eichlerjiri.mapcomponent.utils.CachedTile;
+import static eichlerjiri.mapcomponent.utils.Common.*;
 import eichlerjiri.mapcomponent.utils.FloatList;
 import eichlerjiri.mapcomponent.utils.LoadedTile;
 import eichlerjiri.mapcomponent.utils.ObjectMap;
 import eichlerjiri.mapcomponent.utils.TileKey;
-
-import static android.opengl.GLES20.*;
-import static eichlerjiri.mapcomponent.utils.Common.*;
 import static java.lang.Math.*;
+import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class MapComponentRenderer {
 
     public final MapComponent mapComponent;
-    public volatile MapDataRenderer dr = new MapDataRenderer(0, 0, 0, 0, 0, 0);
+    public AtomicReference<MapDataRenderer> dr = new AtomicReference<>(new MapDataRenderer(0, 0, 0, 0, 0, 0));
 
     public MapData d;
     public int tick;
@@ -82,13 +80,15 @@ public class MapComponentRenderer {
     public void setDimensions(int width, int height) {
         glViewport(0, 0, width, height);
 
-        dr = new MapDataRenderer(width, height, width - 20 - 80, 20, 80, 80);
+        int pad = round(10 * mapComponent.spSize);
+        int dim = round(40 * mapComponent.spSize);
+        dr.set(new MapDataRenderer(width, height, width - pad - dim, pad, dim, dim));
 
         refreshScreenSizeValues();
     }
 
     public void drawFrame() {
-        d = mapComponent.dCommited;
+        d = mapComponent.dCommited.get();
         tick++;
 
         if (d.zoom != zoom) {
@@ -374,6 +374,8 @@ public class MapComponentRenderer {
     }
 
     public void drawCenterButton() {
+        MapDataRenderer dr = this.dr.get();
+
         Matrix.translateM(tmpMatrix, 0, mapMatrix, 0, dr.centerButtonX, dr.centerButtonY, 0);
         Matrix.scaleM(tmpMatrix, 0, dr.centerButtonWidth, dr.centerButtonHeight, 1);
 
@@ -473,6 +475,8 @@ public class MapComponentRenderer {
     }
 
     public void refreshScreenSizeValues() {
+        MapDataRenderer dr = this.dr.get();
+
         surfaceCenterX = dr.width * 0.5f;
         surfaceCenterY = dr.height * 0.5f;
 

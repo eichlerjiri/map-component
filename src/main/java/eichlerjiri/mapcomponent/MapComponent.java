@@ -5,16 +5,14 @@ import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
-
-import javax.microedition.khronos.egl.EGLConfig;
-import javax.microedition.khronos.opengles.GL10;
-
 import eichlerjiri.mapcomponent.tiles.TileDownloadPool;
 import eichlerjiri.mapcomponent.tiles.TileLoadPool;
-import eichlerjiri.mapcomponent.utils.ObjectList;
-
 import static eichlerjiri.mapcomponent.utils.Common.*;
+import eichlerjiri.mapcomponent.utils.ObjectList;
 import static java.lang.Math.*;
+import java.util.concurrent.atomic.AtomicReference;
+import javax.microedition.khronos.egl.EGLConfig;
+import javax.microedition.khronos.opengles.GL10;
 
 public abstract class MapComponent extends GLSurfaceView {
 
@@ -23,7 +21,7 @@ public abstract class MapComponent extends GLSurfaceView {
 
     public MapComponentRenderer renderer;
     public final MapData d = new MapData();
-    public volatile MapData dCommited = new MapData();
+    public AtomicReference<MapData> dCommited = new AtomicReference<>(new MapData());
 
     public final TileLoadPool tileLoadPool;
     public final TileDownloadPool tileDownloadPool;
@@ -129,7 +127,7 @@ public abstract class MapComponent extends GLSurfaceView {
     }
 
     public void commit() {
-        dCommited = d.copy();
+        dCommited.set(d.copy());
         requestRender();
     }
 
@@ -154,7 +152,7 @@ public abstract class MapComponent extends GLSurfaceView {
             float y = event.getY(index);
 
             if (id == 0) {
-                MapDataRenderer dr = renderer.dr;
+                MapDataRenderer dr = renderer.dr.get();
                 if (dr.centerButtonX <= x && dr.centerButtonX + dr.centerButtonWidth > x && dr.centerButtonY <= y && dr.centerButtonY + dr.centerButtonHeight > y) {
                     pressed = id;
                     zz_startCentering();

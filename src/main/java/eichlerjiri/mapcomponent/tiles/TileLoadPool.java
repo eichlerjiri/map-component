@@ -1,18 +1,16 @@
 package eichlerjiri.mapcomponent.tiles;
 
 import android.content.Context;
-
+import eichlerjiri.mapcomponent.MapComponent;
+import eichlerjiri.mapcomponent.utils.LoadedTile;
+import eichlerjiri.mapcomponent.utils.ObjectMap;
+import eichlerjiri.mapcomponent.utils.RequestedTile;
 import java.io.File;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
-import eichlerjiri.mapcomponent.MapComponent;
-import eichlerjiri.mapcomponent.utils.LoadedTile;
-import eichlerjiri.mapcomponent.utils.ObjectMap;
-import eichlerjiri.mapcomponent.utils.RequestedTile;
 
 public class TileLoadPool extends ThreadPoolExecutor {
 
@@ -24,7 +22,7 @@ public class TileLoadPool extends ThreadPoolExecutor {
     public final ConcurrentLinkedQueue<LoadedTile> loadedTiles = new ConcurrentLinkedQueue<>();
 
     public TileLoadPool(Context c, MapComponent mc) {
-        super(1, 1, 0L, TimeUnit.SECONDS, new PriorityBlockingQueue<Runnable>(), new ThreadFactory() {
+        super(1, 1, 0L, TimeUnit.SECONDS, new PriorityBlockingQueue<>(), new ThreadFactory() {
             @Override
             public Thread newThread(Runnable runnable) {
                 Thread t = new Thread(runnable);
@@ -40,7 +38,7 @@ public class TileLoadPool extends ThreadPoolExecutor {
     public void processLoaded() {
         RequestedTile cancelledTile;
         while ((cancelledTile = cancelledTiles.poll()) != null) {
-            if (cancelledTile.cancelled) {
+            if (cancelledTile.cancelled.get()) {
                 requestedTiles.remove(cancelledTile);
             } else {
                 execute(new TileLoader(mc, cancelledTile));
@@ -50,7 +48,7 @@ public class TileLoadPool extends ThreadPoolExecutor {
         LoadedTile loadedTile;
         while ((loadedTile = loadedTiles.poll()) != null) {
             RequestedTile requestedTile = requestedTiles.remove(loadedTile);
-            if (!requestedTile.cancelled) {
+            if (!requestedTile.cancelled.get()) {
                 mc.renderer.tileLoaded(loadedTile);
             }
         }
@@ -61,8 +59,8 @@ public class TileLoadPool extends ThreadPoolExecutor {
 
         if (previousRunnable != null) {
             previousRunnable.tick = tick;
-            previousRunnable.priority = priority;
-            previousRunnable.cancelled = false;
+            previousRunnable.priority.set(priority);
+            previousRunnable.cancelled.set(false);
         } else {
             RequestedTile requestedTile = new RequestedTile(z, x, y, tick, priority);
             requestedTiles.put(requestedTile);
@@ -76,7 +74,7 @@ public class TileLoadPool extends ThreadPoolExecutor {
             RequestedTile entry = requestedTiles.data[i];
             while (entry != null) {
                 if (entry.tick != tick) {
-                    entry.cancelled = true;
+                    entry.cancelled.set(true);
                 }
                 entry = entry.next;
             }

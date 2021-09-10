@@ -2,21 +2,22 @@ package eichlerjiri.mapcomponent.tiles;
 
 import eichlerjiri.mapcomponent.MapComponent;
 import eichlerjiri.mapcomponent.utils.RequestedTile;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public abstract class TileRunnable implements Runnable, Comparable<TileRunnable> {
 
     public final MapComponent mc;
     public final RequestedTile tile;
-    public volatile int priority;
+    public AtomicInteger priority;
 
     public TileRunnable(MapComponent mc, RequestedTile tile) {
         this.mc = mc;
         this.tile = tile;
-        priority = tile.priority;
+        priority = new AtomicInteger(tile.priority.get());
     }
 
     @Override
     public int compareTo(TileRunnable o) {
-        return priority - o.priority;
+        return priority.get() - o.priority.get();
     }
 }

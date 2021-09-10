@@ -1,25 +1,25 @@
 package eichlerjiri.mapcomponent.utils;
 
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import static android.opengl.GLES20.*;
 import android.util.Log;
-
 import java.io.ByteArrayOutputStream;
-import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
+import static java.lang.Math.*;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
+import java.net.Socket;
 import java.net.URL;
 import java.nio.ByteBuffer;
-
-import static android.opengl.GLES20.*;
-import static java.lang.Math.*;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 
 public class Common {
 
@@ -72,53 +72,98 @@ public class Common {
     }
 
     public static byte[] download(String url) throws InterruptedIOException {
-        HttpURLConnection conn = null;
+        HttpsURLConnection conn = null;
         try {
-            conn = (HttpURLConnection) new URL(url).openConnection();
+            conn = (HttpsURLConnection) new URL(url).openConnection();
+            conn.setSSLSocketFactory(prepareSSLSocketFactory());
+
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:64.0) Gecko/20100101 Firefox/64.0");
-            InputStream is = conn.getInputStream();
-            try {
+            try (InputStream is = conn.getInputStream()) {
                 return readAll(is);
-            } finally {
-                closeStream(is);
             }
         } catch (InterruptedIOException e) {
             throw e;
         } catch (IOException e) {
             Log.e("Common", "Cannot download file: " + url, e);
             if (conn != null) {
-                InputStream es = conn.getErrorStream();
-                if (es != null) {
-                    readAll(es);
-                    closeStream(es);
-                }
+                readErrorStream(conn);
             }
             return null;
         }
     }
 
-    public static byte[] readFile(File file) throws InterruptedIOException {
-        try {
-            FileInputStream fis = new FileInputStream(file);
-            try {
-                return readAll(fis);
-            } finally {
-                closeStream(fis);
+    public static SSLSocketFactory prepareSSLSocketFactory() {
+        return new SSLSocketFactory() {
+            @Override
+            public String[] getDefaultCipherSuites() {
+                return ((SSLSocketFactory) SSLSocketFactory.getDefault()).getDefaultCipherSuites();
             }
-        } catch (FileNotFoundException e) {
+
+            @Override
+            public String[] getSupportedCipherSuites() {
+                return ((SSLSocketFactory) SSLSocketFactory.getDefault()).getSupportedCipherSuites();
+            }
+
+            @Override
+            public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
+                return enableTLS(((SSLSocketFactory) SSLSocketFactory.getDefault()).createSocket(s, host, port, autoClose));
+            }
+
+            @Override
+            public Socket createSocket(String host, int port) throws IOException {
+                return enableTLS(SSLSocketFactory.getDefault().createSocket(host, port));
+            }
+
+            @Override
+            public Socket createSocket(String host, int port, InetAddress localHost, int localPort) throws IOException {
+                return enableTLS(SSLSocketFactory.getDefault().createSocket(host, port, localHost, localPort));
+            }
+
+            @Override
+            public Socket createSocket(java.net.InetAddress host, int port) throws IOException {
+                return enableTLS(SSLSocketFactory.getDefault().createSocket(host, port));
+            }
+
+            @Override
+            public Socket createSocket(java.net.InetAddress address, int port, InetAddress localAddress, int localPort) throws IOException {
+                return enableTLS(SSLSocketFactory.getDefault().createSocket(address, port, localAddress, localPort));
+            }
+
+            public Socket enableTLS(Socket s) {
+                if (s instanceof SSLSocket) {
+                    ((SSLSocket) s).setEnabledProtocols(new String[]{"TLSv1.2"});
+                }
+                return s;
+            }
+        };
+    }
+
+    public static void readErrorStream(HttpURLConnection conn) throws InterruptedIOException {
+        try (InputStream es = conn.getErrorStream()) {
+            if (es != null) {
+                readAll(es);
+            }
+        } catch (InterruptedIOException e) {
+            throw e;
+        } catch (IOException e) {
+            Log.e("Common", "Cannot read error response", e);
+        }
+    }
+
+    public static byte[] readFile(File file) throws InterruptedIOException {
+        try (FileInputStream fis = new FileInputStream(file)) {
+            return readAll(fis);
+        } catch (InterruptedIOException e) {
+            throw e;
+        } catch (IOException e) {
             Log.e("Common", "Cannot read file: " + file, e);
             return null;
         }
     }
 
     public static void writeFile(File file, byte[] data) throws InterruptedIOException {
-        try {
-            FileOutputStream fos = new FileOutputStream(file);
-            try {
-                fos.write(data);
-            } finally {
-                closeStream(fos);
-            }
+        try (FileOutputStream fos = new FileOutputStream(file)) {
+            fos.write(data);
         } catch (InterruptedIOException e) {
             throw e;
         } catch (IOException e) {
@@ -126,31 +171,14 @@ public class Common {
         }
     }
 
-    public static byte[] readAll(InputStream is) throws InterruptedIOException {
-        try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream(is.available());
-            byte[] buffer = new byte[4096];
-            int num;
-            while ((num = is.read(buffer)) != -1) {
-                baos.write(buffer, 0, num);
-            }
-            return baos.toByteArray();
-        } catch (InterruptedIOException e) {
-            throw e;
-        } catch (IOException e) {
-            Log.e("Common", "Cannot read stream", e);
-            return null;
+    public static byte[] readAll(InputStream is) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream(is.available());
+        byte[] buffer = new byte[4096];
+        int num;
+        while ((num = is.read(buffer)) != -1) {
+            baos.write(buffer, 0, num);
         }
-    }
-
-    public static void closeStream(Closeable is) throws InterruptedIOException {
-        try {
-            is.close();
-        } catch (InterruptedIOException e) {
-            throw e;
-        } catch (IOException e) {
-            Log.e("Common", "Cannot close stream", e);
-        }
+        return baos.toByteArray();
     }
 
     public static void multiplyMM(float[] result, float[] first, float[] second) {
