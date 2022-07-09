@@ -17,6 +17,7 @@ import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocket;
@@ -73,22 +74,27 @@ public class Common {
     }
 
     public static byte[] download(String url) throws InterruptedIOException {
-        HttpsURLConnection conn = null;
         try {
-            conn = (HttpsURLConnection) new URL(url).openConnection();
+            HttpsURLConnection conn = (HttpsURLConnection) new URL(url).openConnection();
             conn.setSSLSocketFactory(prepareSSLSocketFactory());
+            conn.setInstanceFollowRedirects(false);
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:97.0) Gecko/20100101 Firefox/97.0");
+            conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
 
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:64.0) Gecko/20100101 Firefox/64.0");
-            try (InputStream is = conn.getInputStream()) {
-                return readAll(is);
+            byte[] response = readHTTPResponse(conn);
+            int code = conn.getResponseCode();
+            if (code != 200) {
+                Log.e("Common", "Cannot download file " + url + ": " + code + ": " + conn.getResponseMessage());
+                return null;
             }
+            return response;
         } catch (InterruptedIOException e) {
             throw e;
+        } catch (UnknownHostException e) {
+            Log.e("Common", "Cannot download file " + url + ": unknown hostname", e);
+            return null;
         } catch (IOException e) {
-            Log.e("Common", "Cannot download file: " + url, e);
-            if (conn != null) {
-                readErrorStream(conn);
-            }
+            Log.e("Common", "Cannot download file " + url, e);
             return null;
         }
     }
@@ -139,15 +145,26 @@ public class Common {
         };
     }
 
-    public static void readErrorStream(HttpURLConnection conn) throws InterruptedIOException {
-        try (InputStream es = conn.getErrorStream()) {
-            if (es != null) {
-                readAll(es);
-            }
-        } catch (InterruptedIOException e) {
-            throw e;
+    public static byte[] readAllAndClose(InputStream is) throws IOException {
+        try {
+            return readAll(is);
+        } finally {
+            is.close();
+        }
+    }
+
+    public static byte[] readHTTPResponse(HttpURLConnection conn) throws IOException {
+        try {
+            return readAllAndClose(conn.getInputStream());
         } catch (IOException e) {
-            Log.e("Common", "Cannot read error response", e);
+            InputStream errorStream = conn.getErrorStream();
+            if (errorStream != null) {
+                return readAllAndClose(errorStream);
+            } else if (conn.getResponseCode() == -1) {
+                throw e;
+            } else {
+                return new byte[]{};
+            }
         }
     }
 
