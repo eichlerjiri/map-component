@@ -5,11 +5,13 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.1.3'
+        classpath 'com.android.tools.build:gradle:7.0.4'
     }
 }
 
 apply plugin: 'com.android.library'
+
+project.gradle.startParameter.excludedTaskNames.add('lint')
 
 android {
     compileOptions {
@@ -20,9 +22,6 @@ android {
     defaultConfig {
         minSdkVersion 19
         targetSdkVersion 31
-    }
-    lintOptions {
-        tasks.lint.enabled = false
     }
 }
 
